@@ -14,20 +14,26 @@ seg.id=dat$seg.id
 tmp=unique(dat[,c('seg.id','ysoma')])
 cond=!is.na(tmp$ysoma)
 ysoma=tmp[cond,'ysoma']
+n.ysoma=length(ysoma)
 
 #priors
 var.betas=c(100,rep(1,nparam-1))
+gamma1=0.1
 
 #initial parameters
-betas=rep(0,nparam)
+ngroups=4
+betas=matrix(0,nparam,ngroups)
 b.gamma=2
+z=sample(1:ngroups,size=n.ysoma,replace=T)
+theta=rep(1/ngroups,ngroups)
 
 #stuff for gibbs sampler
-ngibbs=1000
+ngibbs=10000
 nburn=ngibbs/2
-jump1=list(betas=rep(1,nparam),b.gamma=1)
-accept1=list(betas=rep(0,nparam),b.gamma=0)
-store.betas=matrix(NA,ngibbs,nparam)
+jump1=list(betas=matrix(1,nparam,ngroups),b.gamma=1)
+accept1=list(betas=matrix(0,nparam,ngroups),b.gamma=0)
+store.betas=matrix(NA,ngibbs,nparam*ngroups)
+store.z=matrix(NA,ngibbs,n.ysoma)
 store.b=matrix(NA,ngibbs,1)
 store.llk=matrix(NA,ngibbs,1)
 nadapt=50
@@ -35,28 +41,36 @@ nadapt=50
 for (i in 1:ngibbs){
   print(i)
   
-  #sample betas
+  #sample betas (code in C++?)
   tmp=sample.betas(betas=betas,xmat=xmat,ysoma=ysoma,jump=jump1$betas,
                    b.gamma=b.gamma,nparam=nparam,var.betas=var.betas,
-                   seg.id=seg.id)
+                   seg.id=seg.id,z=z,ngroups=ngroups,n=n)
   betas=tmp$betas
   accept1$betas=accept1$betas+tmp$accept
-  # betas[1]=-1
+  # betas=betas.true
   
   #sample b.gamma
   tmp=sample.b.gamma(betas=betas,xmat=xmat,ysoma=ysoma,jump=jump1$b.gamma,
-                     b.gamma=b.gamma,seg.id=seg.id)
+                     b.gamma=b.gamma,seg.id=seg.id,z=z,n=n)
   b.gamma=tmp$b.gamma
   accept1$b.gamma=accept1$b.gamma+tmp$accept
-  # b.gamma=b.true
+
+  #sample z 
+  z=sample.z(xmat=xmat,betas=betas,n.ysoma=n.ysoma,ngroups=ngroups,seg.id=seg.id,
+             b.gamma=b.gamma,ysoma=ysoma,ltheta=log(theta))
+  # z=aux.true$z
+  
+  #estimate theta
+  theta=sample.theta(z=z,gamma1=gamma1,ngroups=ngroups)
   
   #get llk
-  llk=get.llk(betas=betas,xmat=xmat,ysoma=ysoma,b.gamma=b.gamma,seg.id=seg.id)
+  llk=get.llk(betas=betas,xmat=xmat,ysoma=ysoma,b.gamma=b.gamma,seg.id=seg.id,z=z,n=n)
   
   #store results
   store.betas[i,]=betas
   store.b[i]=b.gamma
   store.llk[i]=llk
+  store.z[i,]=z
   
   #adapt MH
   if (i%%nadapt==0 & i<nburn){

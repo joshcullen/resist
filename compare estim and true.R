@@ -1,12 +1,24 @@
 plot(store.llk,type='l')
+nburn=8000
 abline(v=nburn,col='red')
 plot(store.llk[nburn:ngibbs],type='l')
 
 round(apply(store.betas[nburn:ngibbs,],2,mean),2)
 
-plot(store.betas[nburn:ngibbs,1],type='l')
-
 plot(store.b,type='l')
 plot(store.b[nburn:ngibbs],type='l')
 
-plot(store.b[nburn:ngibbs],store.betas[nburn:ngibbs,1])
+tmp=data.frame(zestim=store.z[ngibbs,],ztrue=aux.true$z)
+tmp1=table(tmp); tmp1
+
+ordem=numeric()
+for (i in 1:ncol(tmp1)){
+  aux=which(tmp1[,i]==max(tmp1[,i]))  
+  n=length(aux)
+  if (n==1) ordem=c(ordem,aux)
+  if (n>1) ordem=c(ordem,sample(aux,size=1))
+}
+tmp1[ordem,]
+
+betas.estim=matrix(store.betas[ngibbs,],nparam,ngroups)
+plot(betas.estim[,ordem],betas.true)
