@@ -1,11 +1,13 @@
 rm(list=ls())
-set.seed(1)
+set.seed(3)
 
 #calculate covariates
 setwd('U:\\GIT_models\\resist')
-xmat=read.csv('spatially correlated xmat.csv',as.is=T)
-xmat=data.matrix(xmat)
-nomes.cov=colnames(xmat)
+n=10000
+nparam=5
+xmat=matrix(runif(n*nparam,min=-3,max=3),n,nparam)
+nomes.cov=paste0('covs',1:nparam)
+colnames(xmat)=nomes.cov
 n=nrow(xmat)
 
 #get groups

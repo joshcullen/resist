@@ -21,4 +21,6 @@ for (i in 1:ncol(tmp1)){
 tmp1[ordem,]
 
 betas.estim=matrix(store.betas[ngibbs,],nparam,ngroups)
-plot(betas.estim[,ordem],betas.true)
+rango=range(c(betas.estim,betas.true))
+plot(betas.estim[,ordem],betas.true,xlim=rango,ylim=rango)
+lines(rango,rango,col='red')
