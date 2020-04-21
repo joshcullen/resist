@@ -1,26 +1,11 @@
-plot(mod$llk,type='l')
-nburn=9500
+plot(store.llk,type='l')
+nburn=200
 abline(v=nburn,col='red')
-plot(mod$llk[nburn:ngibbs],type='l')
+plot(store.llk[nburn:ngibbs],type='l')
 
-plot(mod$b.gamma,type='l')
-plot(mod$b.gamma[nburn:ngibbs],type='l')
-quantile(mod$b.gamma[nburn:ngibbs],c(0.025,0.5,0.975))
+plot(store.b,type='l')
+plot(store.b[nburn:ngibbs],type='l')
 
-mod$theta[ngibbs,]
-tmp=data.frame(zestim=mod$z[ngibbs,],ztrue=aux.true$z)
-tmp1=table(tmp); tmp1
+plot(store.b[nburn:ngibbs],store.betas[nburn:ngibbs,1])
 
-ordem=numeric()
-for (i in 1:ncol(tmp1)){
-  aux=which(tmp1[,i]==max(tmp1[,i]))  
-  n=length(aux)
-  if (n==1) ordem=c(ordem,aux)
-  if (n>1) ordem=c(ordem,sample(aux,size=1))
-}
-tmp1[ordem,]
-
-betas.estim=matrix(mod$betas[ngibbs,],nparam,ngroups)
-rango=range(c(betas.estim,betas.true))
-plot(betas.estim[,ordem],betas.true,xlim=rango,ylim=rango)
-lines(rango,rango,col='red')
+plot(store.betas[1:ngibbs,1],type='l')
