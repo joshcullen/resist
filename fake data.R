@@ -3,32 +3,45 @@ set.seed(4)
 
 setwd('U:\\GIT_models\\resist')
 n=10000
-nparam=5
+nparam=3
 xmat=matrix(runif(n*nparam,min=-1,max=1),n,nparam)
 nomes.cov=paste0('covs',1:nparam)
 colnames(xmat)=nomes.cov
 n=nrow(xmat)
 
-betas.true=betas=c(-1,0,1,0,-1,0)
+ngroup=3
+betas.true=betas=matrix(c(-1,0 ,1,
+                           1,0 ,1,
+                          -1,-1,0,
+                           0, 0,1),nparam+1,ngroup,byrow=T)
 media=exp(cbind(1,xmat)%*%betas); range(round(media,3))
 
 b.true=b=2
 a=b*media
-y=rgamma(n,a,b); range(y)
+ymat=matrix(rgamma(n*ngroup,a,b),n,ngroup); range(ymat)
 
-fim=as.data.frame(cbind(y,xmat))
+fim=as.data.frame(xmat)
+fim$z=NA
 fim$ysoma=NA
 fim$seg.id=NA
+
 #aggregate these data
 ind=sort(c(sample(1:n,size=n/10),1,n)) #has to include 1 and n to use all observations
 for (i in 2:length(ind)){
   seq1=ind[i-1]:(ind[i]-1)
+  n=length(seq1)
   fim$seg.id[seq1]=i-1
-  if (n==1) ysoma=fim[seq1,'y']
-  if (n> 1) ysoma=sum(fim[seq1,'y'])
-  fim$ysoma[ind[i]-1]=ysoma
+  z=sample(1:ngroup,size=1)
+  fim$z[ind[i]-1]=z
+  ysoma=ymat[seq1,z]
+  fim$ysoma[ind[i]-1]=sum(ysoma)
 }
 
-ind=which(colnames(fim)=='y')
+#get z.true
+tmp=unique(fim[,c('z','seg.id')])
+z.true=tmp[!is.na(tmp$z),'z']
+
+#export results
+ind=which(colnames(fim)=='z')
 setwd('U:\\GIT_models\\resist')
 write.csv(fim[,-ind],'fake data.csv',row.names=F)
