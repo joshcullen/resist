@@ -37,7 +37,7 @@ llk_betas=function(xmat,ysoma1,betas1,b.gamma,var.betas,seg.id,z,target.group,n.
     sum(dnorm(betas1,mean=0,sd=sqrt(var.betas),log=T))
 }
 #-------------------------------------------
-Shrink_Sample_Betas=function(rango1,yslice,MaxIter,betas1,target.beta,ysoma1,xmat,seg.id,z,target.group,n.ysoma){
+Shrink_Sample_Betas=function(rango1,yslice,MaxIter,betas1,target.beta,ysoma1,xmat,seg.id,z,target.group,n.ysoma,b.gamma){
   diff1=rango1[2]-rango1[1]
   yfim=-Inf
   oo=0
@@ -77,7 +77,7 @@ Sample_betas=function(ngroups,nparam,xmat,z,ysoma,betas,b.gamma,var.betas,w,MaxI
       #sample this particular parameter
       tmp=Shrink_Sample_Betas(rango1=rango1,yslice=yslice,MaxIter=MaxIter,
                               betas1=betas[,i],target.beta=j,ysoma1=ysoma1,xmat=xmat,
-                              seg.id=seg.id,z=z,target.group=i,n.ysoma=n.ysoma) 
+                              seg.id=seg.id,z=z,target.group=i,n.ysoma=n.ysoma,b.gamma=b.gamma) 
       betas[,i]=tmp
     }
   }

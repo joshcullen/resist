@@ -1,5 +1,5 @@
 rm(list=ls())
-set.seed(3)
+set.seed(4)
 
 #calculate covariates
 setwd('U:\\GIT_models\\resist')
@@ -20,11 +20,11 @@ aux.true=aux=data.frame(init1=init1,end1=end1,z=sample(1:ngroup,size=length(init
 nparam=6
 betas.true=betas=matrix(c(-1,0 ,1,0,-1,0,
                            1,0 ,1,0, 1,0,
-                          -1,-1,0,0,0,0,
-                           0, 0,1,1,0,0),nparam,ngroup)
-media=exp(cbind(1,xmat)%*%betas)
+                          -1,-1,0,0, 0,0,
+                           0, 0,1,1, 0,0),nparam,ngroup)
+media=exp(cbind(1,xmat)%*%betas); range(media)
 
-b.true=b=0.5
+b.true=b=200
 atmp=b*media
 
 #generate data
@@ -35,6 +35,7 @@ for (i in 1:n){
   a.gamma[i]=atmp[i,z]
 }
 y=rgamma(n,a.gamma,b)
+plot(a.gamma/b,y)
 fim=as.data.frame(cbind(y,xmat))
 
 #aggregate these data

@@ -1,14 +1,14 @@
-plot(store.llk,type='l')
-nburn=8000
+plot(mod$llk,type='l')
+nburn=9500
 abline(v=nburn,col='red')
-plot(store.llk[nburn:ngibbs],type='l')
+plot(mod$llk[nburn:ngibbs],type='l')
 
-round(apply(store.betas[nburn:ngibbs,],2,mean),2)
+plot(mod$b.gamma,type='l')
+plot(mod$b.gamma[nburn:ngibbs],type='l')
+quantile(mod$b.gamma[nburn:ngibbs],c(0.025,0.5,0.975))
 
-plot(store.b,type='l')
-plot(store.b[nburn:ngibbs],type='l')
-
-tmp=data.frame(zestim=store.z[ngibbs,],ztrue=aux.true$z)
+mod$theta[ngibbs,]
+tmp=data.frame(zestim=mod$z[ngibbs,],ztrue=aux.true$z)
 tmp1=table(tmp); tmp1
 
 ordem=numeric()
@@ -20,7 +20,7 @@ for (i in 1:ncol(tmp1)){
 }
 tmp1[ordem,]
 
-betas.estim=matrix(store.betas[ngibbs,],nparam,ngroups)
+betas.estim=matrix(mod$betas[ngibbs,],nparam,ngroups)
 rango=range(c(betas.estim,betas.true))
 plot(betas.estim[,ordem],betas.true,xlim=rango,ylim=rango)
 lines(rango,rango,col='red')
