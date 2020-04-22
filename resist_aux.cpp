@@ -10,6 +10,22 @@ using namespace Rcpp;
 /*********************************                      UTILS          *****************************************************/
 /***************************************************************************************************************************/
 
+// This function calculates the sum of llk for each group
+// [[Rcpp::export]]
+NumericVector GetSomaLlkGroups(NumericMatrix llk, IntegerVector z, int ngroups) {
+  int n=llk.nrow();
+  NumericVector llk1(ngroups);
+  
+  for(int i=0;i<n;i++){
+    for(int j=0; j<ngroups;j++){
+      if (z[i]==j){
+        llk1[j]=llk1[j]+llk(i,j);
+      }
+    }      
+  }
+  return llk1;
+}
+
 // This function calculates the sum of means for each segment and each group
 // [[Rcpp::export]]
 NumericMatrix GetSomaMediaAllGroups(NumericMatrix media, int ngroups, int nysoma,IntegerVector SegID) {
@@ -50,4 +66,19 @@ IntegerVector rmultinom1(NumericMatrix prob, NumericVector runif1){
     z[i]=whichLessDVPresence(runif1[i], prob(i,_));
   }
   return z;
+}
+
+// This function calculates probabilities to sample z
+// [[Rcpp::export]]
+NumericMatrix GetProbZ(NumericMatrix llk){
+  double max1;
+  double soma;
+  for (int i = 0; i < llk.nrow(); i++){
+    max1=max(llk(i,_));
+    llk(i,_)=llk(i,_)-max1;
+    llk(i,_)=exp(llk(i,_));
+    soma=sum(llk(i,_));
+    llk(i,_)=llk(i,_)/soma;
+  }
+  return llk;
 }

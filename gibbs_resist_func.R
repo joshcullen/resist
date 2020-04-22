@@ -17,12 +17,14 @@ sample.betas=function(betas,xmat,ysoma,jump,nparam,b.gamma,var.betas,seg.id,
     prior.prop=dnorm(betas.prop[i,],mean=0,sd=sqrt(var.betas[i]),log=T)
   
     #sum the loglikel for the correct group
-    pold1=pnew1=rep(NA,ngroup)
-    for (j in 1:ngroup){
-      cond=z==j
-      pold1[j]=sum(pold[cond,j])
-      pnew1[j]=sum(pnew[cond,j])
-    }    
+    pold1=GetSomaLlkGroups(llk=pold, z=z-1, ngroups=ngroup)
+    pnew1=GetSomaLlkGroups(llk=pnew, z=z-1, ngroups=ngroup)
+    # pold1=pnew1=rep(NA,ngroup)
+    # for (j in 1:ngroup){
+    #   cond=z==j
+    #   pold1[j]=sum(pold[cond,j])
+    #   pnew1[j]=sum(pnew[cond,j])
+    # }
     
     #MH algorithm
     pold2=pold1+prior.old
@@ -39,12 +41,6 @@ sample.betas=function(betas,xmat,ysoma,jump,nparam,b.gamma,var.betas,seg.id,
 get.llk=function(betas,xmat,ysoma,b.gamma,seg.id,nagg,ngroup){
   media=exp(xmat%*%betas)
   soma.media1=GetSomaMediaAllGroups(media=media, ngroups=ngroup, nysoma=length(ysoma),SegID=seg.id-1)
-  # soma.media=numeric()
-  # for (i in 1:ngroup){
-  #   tmp=data.frame(media=media[,i],seg.id=seg.id)  
-  #   tmp1=aggregate(media~seg.id,data=tmp,sum)
-  #   soma.media=cbind(soma.media,tmp1$media)
-  # }
   a.gamma=b.gamma*soma.media1
   ysoma.mat=matrix(ysoma,nagg,ngroup)
   dgamma(ysoma.mat,a.gamma,b.gamma,log=T)
@@ -61,15 +57,16 @@ sample.b.gamma=function(betas,xmat,ysoma,jump,b.gamma,seg.id,z,
                seg.id=seg.id,ngroup=ngroup,nagg=nagg)
   
   #sum the loglikel for the correct group
-  pold1=pnew1=0
-  for (j in 1:ngroup){
-    cond=z==j
-    pold1=pold1+sum(pold[cond,j])
-    pnew1=pnew1+sum(pnew[cond,j])
-  }    
+  pold1=GetSomaLlkGroups(llk=pold, z=z-1, ngroups=ngroup)
+  pnew1=GetSomaLlkGroups(llk=pnew, z=z-1, ngroups=ngroup)
+  # for (j in 1:ngroup){
+  #   cond=z==j
+  #   pold1=pold1+sum(pold[cond,j])
+  #   pnew1=pnew1+sum(pnew[cond,j])
+  # }    
   
   #MH algorithm
-  pthresh=exp(pnew1-pold1)
+  pthresh=exp(sum(pnew1)-sum(pold1))
   accept=0
   if (runif(1)<pthresh){
     accept=1
@@ -78,14 +75,18 @@ sample.b.gamma=function(betas,xmat,ysoma,jump,b.gamma,seg.id,z,
   list(accept=accept,b.gamma=b.old)
 }
 #--------------------------------------------------
-sample.z=function(betas,xmat,ysoma,b.gamma,seg.id,ngroup,nagg){
+sample.z=function(betas,xmat,ysoma,b.gamma,seg.id,ngroup,nagg,theta){
   llk=get.llk(betas=betas,xmat=xmat,ysoma=ysoma,b.gamma=b.gamma,
               seg.id=seg.id,ngroup=ngroup,nagg=nagg)
-  min1=apply(llk,1,min)
-  llk1=llk-min1
-  llk2=exp(llk1)
-  llk3=llk2/apply(llk2,1,sum)
-  tmp=rmultinom1(prob=llk3, runif1=runif(nrow(llk3)))
+  ltheta=matrix(log(theta),nrow(llk),ngroup,byrow=T)
+  
+  llk=llk+ltheta
+  prob=GetProbZ(llk=llk)
+  # max1=apply(llk,1,max)
+  # llk1=llk-max1
+  # llk2=exp(llk1)
+  # llk3=llk2/apply(llk2,1,sum)
+  tmp=rmultinom1(prob=prob, runif1=runif(nrow(prob)))
   tmp+1
 }
 #----------------------------------
@@ -107,4 +108,27 @@ print.adapt = function(accept1z,jump1z,accept.output){
   }
   
   return(list(jump1=jump1,accept1=accept1))
+}
+#--------------------------------
+sample.theta=function(z,gamma1,ngroup){
+  #get summary statistics
+  tab1=table(z)
+  nk=rep(0,ngroup)
+  nk[as.numeric(names(tab1))]=tab1
+  
+  tmp=(cumsum(nk[ngroup:1]))[ngroup:1]
+  ngk=tmp[-1]
+  
+  #sample vk
+  vk=rbeta(ngroup-1,nk[-ngroup]+1,ngk+gamma1)
+  vk=c(vk,1)
+  
+  #calculate theta
+  theta=vk
+  prod1=1
+  for (i in 2:ngroup){
+    prod1=prod1*(1-vk[i-1])
+    theta[i]=vk[i]*prod1
+  }
+  theta
 }
