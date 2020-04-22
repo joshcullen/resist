@@ -1,8 +1,10 @@
 rm(list=ls())
+library('Rcpp')
 set.seed(1)
 
 setwd('U:\\GIT_models\\resist')
 source('gibbs_resist_func.R')
+sourceCpp('resist_aux.cpp')
 dat=read.csv('fake data.csv',as.is=T)
 n=nrow(dat)
 ind=grep('cov',colnames(dat))
@@ -33,7 +35,7 @@ accept1=list(betas=matrix(0,nparam,ngroup),b.gamma=0)
 store.betas=matrix(NA,ngibbs,nparam*ngroup)
 store.b=matrix(NA,ngibbs,1)
 store.llk=matrix(NA,ngibbs,1)
-nadapt=50
+accept.output=100
 
 for (i in 1:ngibbs){
   print(i)
@@ -54,7 +56,8 @@ for (i in 1:ngibbs){
   # b.gamma=b.true
   
   #sample z
-  z=z.true
+  z=sample.z(betas=betas,xmat=xmat,ysoma=ysoma,b.gamma=b.gamma,
+             seg.id=seg.id,ngroup=ngroup,nagg=nagg)
   
   #get llk
   p=get.llk(betas=betas,xmat=xmat,ysoma=ysoma,b.gamma=b.gamma,
@@ -66,8 +69,16 @@ for (i in 1:ngibbs){
     llk=llk+sum(p[cond,j])
   }    
 
+  #adaptation MH algorithm
+  if (i<nburn & i%%accept.output==0){
+    k=print.adapt(accept1z=accept1,jump1z=jump1,accept.output=accept.output)
+    accept1=k$accept1
+    jump1=k$jump1
+  }
+  
   #store results
   store.betas[i,]=betas
   store.b[i]=b.gamma
   store.llk[i]=llk
+  z.estim=z
 }

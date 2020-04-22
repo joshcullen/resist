@@ -1,5 +1,5 @@
 rm(list=ls())
-set.seed(4)
+set.seed(9)
 
 setwd('U:\\GIT_models\\resist')
 n=10000
@@ -26,7 +26,7 @@ fim$ysoma=NA
 fim$seg.id=NA
 
 #aggregate these data
-ind=sort(c(sample(1:n,size=n/10),1,n)) #has to include 1 and n to use all observations
+ind=sort(c(sample(1:n,size=n/10),1,n+1)) #has to include 1 and n to use all observations
 for (i in 2:length(ind)){
   seq1=ind[i-1]:(ind[i]-1)
   n=length(seq1)
@@ -36,6 +36,8 @@ for (i in 2:length(ind)){
   ysoma=ymat[seq1,z]
   fim$ysoma[ind[i]-1]=sum(ysoma)
 }
+max(fim$seg.id)
+length(unique(fim$seg.id))
 
 #get z.true
 tmp=unique(fim[,c('z','seg.id')])

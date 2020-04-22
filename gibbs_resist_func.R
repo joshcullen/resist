@@ -38,13 +38,14 @@ sample.betas=function(betas,xmat,ysoma,jump,nparam,b.gamma,var.betas,seg.id,
 #---------------------------------------------------
 get.llk=function(betas,xmat,ysoma,b.gamma,seg.id,nagg,ngroup){
   media=exp(xmat%*%betas)
-  soma.media=numeric()
-  for (i in 1:ngroup){
-    tmp=data.frame(media=media[,i],seg.id=seg.id)  
-    tmp1=aggregate(media~seg.id,data=tmp,sum)
-    soma.media=cbind(soma.media,tmp1$media)
-  }
-  a.gamma=b.gamma*soma.media
+  soma.media1=GetSomaMediaAllGroups(media=media, ngroups=ngroup, nysoma=length(ysoma),SegID=seg.id-1)
+  # soma.media=numeric()
+  # for (i in 1:ngroup){
+  #   tmp=data.frame(media=media[,i],seg.id=seg.id)  
+  #   tmp1=aggregate(media~seg.id,data=tmp,sum)
+  #   soma.media=cbind(soma.media,tmp1$media)
+  # }
+  a.gamma=b.gamma*soma.media1
   ysoma.mat=matrix(ysoma,nagg,ngroup)
   dgamma(ysoma.mat,a.gamma,b.gamma,log=T)
 }
@@ -75,4 +76,35 @@ sample.b.gamma=function(betas,xmat,ysoma,jump,b.gamma,seg.id,z,
     b.old=b.new
   }
   list(accept=accept,b.gamma=b.old)
+}
+#--------------------------------------------------
+sample.z=function(betas,xmat,ysoma,b.gamma,seg.id,ngroup,nagg){
+  llk=get.llk(betas=betas,xmat=xmat,ysoma=ysoma,b.gamma=b.gamma,
+              seg.id=seg.id,ngroup=ngroup,nagg=nagg)
+  min1=apply(llk,1,min)
+  llk1=llk-min1
+  llk2=exp(llk1)
+  llk3=llk2/apply(llk2,1,sum)
+  tmp=rmultinom1(prob=llk3, runif1=runif(nrow(llk3)))
+  tmp+1
+}
+#----------------------------------
+print.adapt = function(accept1z,jump1z,accept.output){
+  accept1=accept1z; jump1=jump1z; 
+  
+  for (k in 1:length(accept1)){
+    z=accept1[[k]]/accept.output
+    print(names(accept1)[k])
+    print(mean(z)); print(mean(jump1[[k]]))
+  }
+  
+  for (k in 1:length(jump1)){
+    cond=(accept1[[k]]/accept.output)>0.6 & jump1[[k]]<100
+    jump1[[k]][cond] = jump1[[k]][cond]*2       
+    cond=(accept1[[k]]/accept.output)<0.1 & jump1[[k]]>0.01
+    jump1[[k]][cond] = jump1[[k]][cond]*0.5
+    accept1[[k]][]=0
+  }
+  
+  return(list(jump1=jump1,accept1=accept1))
 }
