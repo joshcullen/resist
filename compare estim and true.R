@@ -5,7 +5,7 @@ z.estim=mod.res$z.estim
 
 #look at overall convergence
 plot(store.llk,type='l')
-nburn=2000
+nburn=3000
 abline(v=nburn,col='red')
 plot(store.llk[nburn:ngibbs],type='l')
 
@@ -32,7 +32,7 @@ tab1[ordem,]
 ngroup=10
 par(mfrow=c(1,1),mar=rep(3,4))
 betas.estim=matrix(store.betas[ngibbs,],ncol(store.betas)/ngroup,ngroup)
-rango=range(c(betas.estim,betas.true))
+rango=range(c(betas.estim[,ordem],betas.true))
 plot(betas.true,betas.estim[,ordem],xlim=rango,ylim=rango)
 lines(rango,rango,col='red')
 

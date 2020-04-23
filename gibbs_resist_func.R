@@ -1,7 +1,7 @@
 sample.betas=function(betas,xmat,ysoma,jump,nparam,b.gamma,var.betas,seg.id,
                       z,ngroup,nagg){
   betas.old=betas.new=betas
-  betas.prop=matrix(rnorm(nparam,mean=betas,sd=jump),nparam,ngroup)
+  betas.prop=matrix(rnorm(nparam*ngroup,mean=betas,sd=jump),nparam,ngroup)
   accept=matrix(0,nparam,ngroup)
   
   for (i in 1:nparam){
@@ -34,7 +34,6 @@ sample.betas=function(betas,xmat,ysoma,jump,nparam,b.gamma,var.betas,seg.id,
     betas.old[i,cond]=betas.new[i,cond]
     accept[i,cond]=1
   }
-  accept
   list(accept=accept,betas=betas.old)
 }
 #---------------------------------------------------
@@ -96,7 +95,7 @@ print.adapt = function(accept1z,jump1z,accept.output){
   for (k in 1:length(accept1)){
     z=accept1[[k]]/accept.output
     print(names(accept1)[k])
-    print(mean(z)); print(mean(jump1[[k]]))
+    print(z); print(jump1[[k]])
   }
   
   for (k in 1:length(jump1)){

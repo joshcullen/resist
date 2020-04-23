@@ -10,13 +10,13 @@ gibbs_resist=function(ysoma,xmat,seg.id,ngroup,ngibbs,nburn,gamma1,var.betas){
   theta=rep(1/ngroup,ngroup)
   
   #stuff for gibbs sampler
-  jump1=list(betas=matrix(1,nparam,ngroup),b.gamma=1)
+  jump1=list(betas=matrix(0.1,nparam,ngroup),b.gamma=0.1)
   accept1=list(betas=matrix(0,nparam,ngroup),b.gamma=0)
   store.betas=matrix(NA,ngibbs,nparam*ngroup)
   store.b=matrix(NA,ngibbs,1)
   store.theta=matrix(NA,ngibbs,ngroup)
   store.llk=matrix(NA,ngibbs,1)
-  accept.output=100
+  accept.output=50
   
   for (i in 1:ngibbs){
     print(i)

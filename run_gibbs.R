@@ -1,6 +1,6 @@
 rm(list=ls())
 library('Rcpp')
-set.seed(1)
+set.seed(121)
 
 setwd('U:\\GIT_models\\resist')
 source('gibbs_resist.R')
@@ -20,7 +20,7 @@ ngibbs=10000
 nburn=ngibbs/2
 
 #priors
-gamma1=0.01
+gamma1=0.1
 var.betas=c(100,rep(1,ncol(xmat)-1))
 
 mod.res=gibbs_resist(ysoma=ysoma,xmat=xmat,seg.id=seg.id,ngroup=ngroup,

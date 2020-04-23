@@ -1,0 +1,13 @@
+Why do we see no variability after some iterations for some betas?
+
+The problem lies with the occupied groups, rather than the unoccupied groups. Because we only adapt after 100, the model might be stuck with a parameter that doesn't move because it is stuck using a bad jump parameter for a long time.
+
+Another problem is that the algorithm is actively eliminating groups during these initial iterations where parameters are stuck at bad values.
+
+Proposed solutions:
+- start with jump1=0.1 instead of jump1=1
+- update more frequently: after every 50 instead of every 100
+
+There was a huge bug in how I proposed new values (i.e., betas.prop)!
+
+
