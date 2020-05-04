@@ -1,11 +1,11 @@
-rm(list=ls())
 library('Rcpp')
 set.seed(121)
 
-setwd('U:\\GIT_models\\resist')
 source('gibbs_resist.R')
 source('gibbs_resist_func.R')
 sourceCpp('resist_aux.cpp')
+
+
 dat=read.csv('fake data.csv',as.is=T)
 ind=grep('cov',colnames(dat))
 xmat=data.matrix(cbind(1,dat[,ind]))

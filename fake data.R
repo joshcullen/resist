@@ -1,13 +1,11 @@
-rm(list=ls())
 set.seed(131)
 
-setwd('U:\\GIT_models\\resist')
 n=50000
 nparam=3
 xmat=matrix(runif(n*nparam,min=-1.5,max=1.5),n,nparam)
 nomes.cov=paste0('covs',1:nparam)
 colnames(xmat)=nomes.cov
-n=nrow(xmat)
+# n=nrow(xmat)
 
 ngroup=7
 betas.true=betas=matrix(c(-1,0 , 1,-1, 0, 1, 0,
@@ -46,5 +44,4 @@ table(z.true)
 
 #export results
 ind=which(colnames(fim)=='z')
-setwd('U:\\GIT_models\\resist')
 write.csv(fim[,-ind],'fake data.csv',row.names=F)
