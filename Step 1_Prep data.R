@@ -25,6 +25,8 @@ dat.S<- dat[dat$y < 8100000,]
 
 
 ### Read in rasters
+setwd("~/Documents/Snail Kite Project/Data/armadillos/Environ Data")
+
 rast <- dir(getwd(), "*.tif$")
 for (i in rast) assign(i, raster(i))
 plot(classes_DL_padrao.tif)
@@ -53,6 +55,7 @@ dist2rdN_30m<- raster::aggregate(EucDist_cerc_Copy.tif,
 
 path<- raster::extract(dist2rdN_30m, tm14.line, along = TRUE, cellnumbers = TRUE)
 path_df = purrr::map_dfr(path, as_data_frame, .id = "ID")
+names(path_df)[3]<- "dist2rd"
 path_coords = xyFromCell(dist2rdN_30m, path_df$cell)
 # pair_dist = geosphere::distGeo(path_coords)[-nrow(path_coords)]
 # transect_df$dist = c(0, cumsum(pair_dist)) 
@@ -90,3 +93,8 @@ for (i in 2:length(ind)){
   seq1=(ind[i-1] + 1):ind[i]
   resist.dat$seg.id[seq1]=i-1
 }
+
+
+# Export data
+setwd("~/Documents/Snail Kite Project/Data/R Scripts/ValleLabUF/resist")
+# write.csv(resist.dat, "Armadillo Resistance Data.csv", row.names = F)
