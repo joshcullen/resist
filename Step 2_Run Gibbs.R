@@ -6,7 +6,7 @@ source('gibbs_resist_func.R')
 sourceCpp('resist_aux.cpp')
 
 dat=read.csv('Armadillo Resistance Data.csv',as.is=T)
-ind=grep('dist2rd',colnames(dat))
+ind=grep('dist',colnames(dat))
 xmat=data.matrix(cbind(1,dat[,ind]))
 seg.id=dat$seg.id
 ngroup=10
