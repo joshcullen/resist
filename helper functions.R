@@ -68,7 +68,13 @@ extract.covars = function(dat.N, dist2rdN_30m, crs) {
   }
   
   names(path)<- ind
+  if (length(path) > 1) {  #adjust seg.id so each is unique across all IDs
+    for (i in 2:length(path)) {
+      path[[i]]$seg.id<- path[[i]]$seg.id + max(path[[i-1]]$seg.id)
+    }
+  }
   path<- bind_rows(path)
+  
   
   path
 }

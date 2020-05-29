@@ -11,41 +11,25 @@ source('helper functions.R')
 ###################
 ### Import data ###
 ###################
+
 setwd("~/Documents/Snail Kite Project/Data/armadillos")
 
-dat<- read.csv("three_banded_over20_for_Josh.csv", header = T, sep = ",")
+dat<- read.csv("Modified Armadillo Data.csv", header = T, sep = ",")
 
 dat$id<- as.character(dat$id)
-dat$date<- as.POSIXct(strptime(dat$date, format = "%d/%m/%Y %H:%M"))
-# coords<- dat[c("x","y")]
-# dat.spdf<- SpatialPointsDataFrame(coords = coords, data = dat)
-# proj4string(dat.spdf)<- CRS("+init=epsg:32721")
+dat$date<- as_datetime(dat$date)
 
-# dat.N<- subset(dat.spdf, dat.spdf$y > 8100000)
-# dat.S<- subset(dat.spdf, dat.spdf$y < 8100000)
-# 
-# 
-# #Convert to Spatial Lines Data Frame
-# x <- lapply(split(dat.N, dat.N$id), function(x) Lines(list(Line(coordinates(x))), x$id[1L]))
-# 
-# # the corrected part goes here:
-# lines <- SpatialLines(x)
-# data <- data.frame(id = unique(dat.N$id))
-# rownames(data) <- data$id
-# dat.N_sldf <- SpatialLinesDataFrame(lines, data)
-# crs(dat.N_sldf)<- CRS("+init=epsg:32721")
-
-## NEED TO MAKE FOR S REGION TOO
-
-dat.N<- dat[dat$y > 8100000,]
-dat.S<- dat[dat$y < 8100000,]
+# Separate tracks by region (N or S)
+dat.N<- dat %>% filter(region == "N")
+dat.S<- dat %>% filter(region == "S")
 
 
-### Read in rasters
+# Read in rasters
 setwd("~/Documents/Snail Kite Project/Data/armadillos/Environ Data")
 
 rast<- dir(getwd(), "*.tif$")
 for (i in rast) assign(i, raster(i))
+
 plot(classes_DL_padrao.tif)
 plot(EucDist_cerc_Copy.tif); points(dat.N$x, dat.N$y)
 plot(EucDist_cercaAm.tif); points(dat.S$x, dat.S$y)
@@ -55,111 +39,86 @@ EucDist_cerc_Copy.tif<- projectRaster(EucDist_cerc_Copy.tif, crs = "+init=epsg:3
 crs(EucDist_cercaAm.tif)<- crs(EucDist_cerc_Copy.tif)
 
 
-
-# Convert DFs to linestrings by ID
-# dat.N_sf<- st_as_sf(dat.N) %>% 
-#   group_by(id) %>% 
-#   summarize(do_union = FALSE) %>% 
-#   st_cast("LINESTRING") %>% 
-#   as_Spatial()
-# plot(dat.N_sf)
-
-# dat.S_sf<- st_as_sf(dat.S, coords=c("x","y"), crs = "+init=epsg:32721") %>% 
-#   group_by(id) %>% 
-#   summarize(do_union = FALSE) %>% 
-#   st_cast("LINESTRING")
-# plot(dat.S_sf)
-
-
 ## Aggregate spatial data to same scale (which will likely be 30m)
-res(EucDist_cerc_Copy.tif) #13m 13m
-dist2rdN_30m<- raster::aggregate(EucDist_cerc_Copy.tif,
-                                 fact = 2,
-                                 fun = mean)
-
 res(EucDist_cercaAm.tif) #1m 1m
 dist2rdS_30m<- raster::aggregate(EucDist_cercaAm.tif,
                                  fact = 30,
                                  fun = mean)
 
+res(EucDist_cerc_Copy.tif) #13m 13m
+#create dummy raster at same extent and proj, but with desired resolution
+ex.ras<- raster(ext = extent(EucDist_cerc_Copy.tif), crs = "+init=epsg:32721", res = 30)
+dist2rdN_30m<- resample(EucDist_cerc_Copy.tif, ex.ras, method = "bilinear")
+# dist2rdN_30m<- raster::aggregate(EucDist_cerc_Copy.tif,
+#                                  fact = 2,
+#                                  fun = mean)
 
-## Extract values from raster layer for each track
 
-#N
+#######################################################
+### Extract values from raster layer for each track ###
+#######################################################
 
 path.N<- extract.covars(dat.N, dist2rdN_30m, crs = "+init=epsg:32721")
-# dat.N_sp<- as(dat.N_sf, "Spatial")
-# crs(dat.N_sp)<- crs(dist2rdN_30m)
-# path_N<- raster::extract(dist2rdN_30m, dat.N_sldf, along = TRUE, cellnumbers = TRUE)
-# names(path_N)<- unique(dat.N$id)
-# path_N_df = purrr::map_dfr(path_N, as_data_frame, .id = "id")
+path.S<- extract.covars(dat.S, dist2rdS_30m, crs = "+init=epsg:32721")
+
 names(path.N)[3]<- "dist2rd"
-# path_N_coords = xyFromCell(dist2rdN_30m, path_N_df$cell)
-# pair_dist = geosphere::distGeo(path_coords)[-nrow(path_coords)]
-# transect_df$dist = c(0, cumsum(pair_dist)) 
+names(path.S)[3]<- "dist2rd"
 
-#double-check that extracted grid cells overlap with tm14 path
-# bar<- dist2rdN_30m
-# bar[]<- NA
-# bar[path_N_df$cell]<- dist2rdN_30m[path_N_df$cell]
+
+#double-check that extracted grid cells overlap with tracks
+
+#N
+bar<- dist2rdN_30m
+bar[]<- NA
+bar[path.N$cell]<- dist2rdN_30m[path.N$cell]
+bar<- as.data.frame(bar, xy = T)
+names(bar)[3]<- "dist"
 # plot(bar)
-# # plot(st_geometry(dat.N_sf), add=T)
-# plot(dat.N_sldf, add=T)
-
+# plot(st_as_sf(x = dat.N,                         
+#                     coords = c("x", "y"),
+#                     crs = "+init=epsg:32721"),
+#      add = T)
+ggplot() +
+  geom_tile(data = bar, aes(x, y, fill = dist), na.rm = T) +
+  scale_fill_viridis_c(option = "inferno", direction = -1, na.value = "n") +
+  geom_path(data = dat.N, aes(x, y, color = id)) +
+  coord_cartesian() +
+  theme_bw()
 
 #S
-# path_S<- raster::extract(dist2rdS_30m, dat.S_sf, along = TRUE, cellnumbers = TRUE)
-# path_S_df = purrr::map_dfr(path_S, as_data_frame, .id = "id")
-# names(path_S_df)[3]<- "dist2rd"
-# path_S_coords = xyFromCell(dist2rdS_30m, path_S_df$cell)
-# # pair_dist = geosphere::distGeo(path_coords)[-nrow(path_coords)]
-# # transect_df$dist = c(0, cumsum(pair_dist)) 
-# 
-# #double-check that extracted grid cells overlap with tm14 path
-# bar<- dist2rdS_30m
-# bar[]<- NA
-# bar[path_S_df$cell]<- dist2rdS_30m[path_S_df$cell]
+bar<- dist2rdS_30m
+bar[]<- NA
+bar[path.S$cell]<- dist2rdS_30m[path.S$cell]
+bar<- as.data.frame(bar, xy = T)
+names(bar)[3]<- "dist"
 # plot(bar)
-# plot(st_geometry(dat.S_sf), add=T)
+# plot(st_as_sf(x = dat.S,                         
+#                           coords = c("x", "y"),
+#                           crs = "+init=epsg:32721"),
+#      add = T)
+ggplot() +
+  geom_tile(data = bar, aes(x, y, fill = dist), na.rm = T) +
+  scale_fill_viridis_c(option = "inferno", direction = -1, na.value = "n") +
+  # geom_path(data = dat.S, aes(x, y, color = id)) +
+  coord_cartesian() +
+  theme_bw()
 
 
+##############################
+### Modify and export data ###
+##############################
+
+# Adjust seg.id values for path.S
+path.S<- df.to.list(path.S, "id")
+for (i in 1:length(path.S)) {
+  path.S[[i]]$seg.id<- path.S[[i]]$seg.id + max(path.N$seg.id)
+}
+path.S<- bind_rows(path.S)
+
+# Merge datasets
+resist.dat<- rbind(path.N, path.S)
 
 
-#Label all observations with cell number and time interval
-# dat.N$cell<- cellFromXY(dist2rdN_30m, dat.N[,c("x","y")])
-# dat.N@data<- dat.N@data %>% 
-#   group_by(id) %>% 
-#   mutate(dt = difftime(date, lag(date), units = "sec")) %>% 
-#   ungroup()
-# 
-# dat.S$cell<- cellFromXY(dist2rdS_30m, dat.S[,c("x","y")])
-# dat.S<- dat.S %>% 
-#   group_by(id) %>% 
-#   mutate(dt = difftime(date, lag(date), units = "sec")) %>% 
-#   ungroup()
-
-# #Determine which cells (chronologically) are associated with those from path_df
-# ind<- vector()
-# for (i in 2:(nrow(path_df) - 1)) {
-#   if (path_df$cell[i] == path_df$cell[i+1])
-#     ind<- c(ind, i)
-# }
-# ind<- c(1, ind, nrow(path_df))
-# 
-# #Add time index to both DFs for merging
-# path_df$time1<- 1:nrow(path_df)
-# tm14$time1<- ind
-# 
-# #Merge datasets
-# resist.dat<- left_join(path_df, tm14, by = 'time1')
-# 
-# #Add seg.id column
-# resist.dat$seg.id<- NA
-# resist.dat$seg.id[1]<- 1  #need to define for 1st obs
-# for (i in 2:length(ind)){
-#   seq1=(ind[i-1] + 1):ind[i]
-#   resist.dat$seg.id[seq1]=i-1
-# }
 
 
 # Export data
