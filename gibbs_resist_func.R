@@ -40,37 +40,41 @@ sample.betas=function(betas,xmat,ysoma,jump,nparam,b.gamma,var.betas,seg.id,
 get.llk=function(betas,xmat,ysoma,b.gamma,seg.id,nagg,ngroup){
   media=exp(xmat%*%betas)
   soma.media1=GetSomaMediaAllGroups(media=media, ngroups=ngroup, nysoma=length(ysoma),SegID=seg.id-1)
-  a.gamma=b.gamma*soma.media1
+  b.gamma1=matrix(b.gamma,nagg,ngroup,byrow=T)
+  a.gamma1=b.gamma1*soma.media1
   ysoma.mat=matrix(ysoma,nagg,ngroup)
-  dgamma(ysoma.mat,a.gamma,b.gamma,log=T)
+  dgamma(ysoma.mat,a.gamma1,b.gamma1,log=T)
 }
 #--------------------------------------------------
 sample.b.gamma=function(betas,xmat,ysoma,jump,b.gamma,seg.id,z,
                         ngroup,nagg){
   b.old=b.gamma
-  b.new=abs(rnorm(1,mean=b.gamma,sd=jump))
-  
+  b.new=abs(rnorm(ngroup,mean=b.gamma,sd=jump))
+
   pold=get.llk(betas=betas,xmat=xmat,ysoma=ysoma,b.gamma=b.old,
                seg.id=seg.id,ngroup=ngroup,nagg=nagg)
   pnew=get.llk(betas=betas,xmat=xmat,ysoma=ysoma,b.gamma=b.new,
                seg.id=seg.id,ngroup=ngroup,nagg=nagg)
-  
+
   #sum the loglikel for the correct group
   pold1=GetSomaLlkGroups(llk=pold, z=z-1, ngroups=ngroup)
   pnew1=GetSomaLlkGroups(llk=pnew, z=z-1, ngroups=ngroup)
+  # pold2=pnew2=rep(NA,ngroup)
   # for (j in 1:ngroup){
   #   cond=z==j
-  #   pold1=pold1+sum(pold[cond,j])
-  #   pnew1=pnew1+sum(pnew[cond,j])
-  # }    
+  #   pold2[j]=sum(pold[cond,j])
+  #   pnew2[j]=sum(pnew[cond,j])
+  # }
+  # unique(pold1-pold2)
+  # unique(pnew1-pnew2)
   
   #MH algorithm
-  pthresh=exp(sum(pnew1)-sum(pold1))
-  accept=0
-  if (runif(1)<pthresh){
-    accept=1
-    b.old=b.new
-  }
+  pthresh=exp(pnew1-pold1)
+  accept=rep(0,ngroup)
+  cond=runif(ngroup)<pthresh
+  accept[cond]=1
+  b.old[cond]=b.new[cond]
+
   list(accept=accept,b.gamma=b.old)
 }
 #--------------------------------------------------

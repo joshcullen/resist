@@ -9,5 +9,31 @@ Proposed solutions:
 - update more frequently: after every 50 instead of every 100
 
 There was a huge bug in how I proposed new values (i.e., betas.prop)!
+#------------------------------------
+June 3rd
 
+I probably need an individual b.gamma for each group. Otherwise, the global b.gamma will be severely impacted by the empty groups and that is not a good thing.
 
+Before, even if we knew the cluster membership, we would still run into problems estimating b.gamma
+
+Now, with one b.gamma per group, we are able to estimate b.gamma well when cluster membership is known.
+
+Let's see what happens when cluster membership is not known in advance.
+
+It might work but we might still have a lot of autocorrelation, in which case we will need to use a slice sampler
+
+Current problem: we identified only 3 behaviors when there were 4!
+
+This does not go away when we limit the maximum number of groups to 4 because we now just identify 2 groups!
+#--------------------------------------------------
+Don't use TSBP. Don't estimate theta. 
+
+I probably changed how I had generated the fake data but forgot to save the new data on disk. This was ruining everything
+
+Current problem: we identified only 2 behaviors when there were 4 (max. groups=10)!
+
+What if we assume just 4 behaviors to begin with and don't estimate theta? Still does not work (the model gets confused between groups 1 and 4)
+
+Change intercepts in fake data and change initial values for b.gamma (to have higher variances): it worked!
+
+Assume we have 10 behaviors. Does it still work? Nope. 
