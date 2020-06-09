@@ -36,13 +36,13 @@ gibbs_resist=function(ysoma,xmat,seg.id,ngroup,ngibbs,nburn,gamma1,var.betas,w,M
     #sample b.gamma
     b.gamma=Sample_bgamma(ngroups=ngroup,nparam=nparam,xmat=xmat,
                           z=z,ysoma=ysoma,betas=betas,b.gamma=b.gamma,
-                          w=w,MaxIter=MaxIter,seg.id=seg.id,nagg=nagg)
+                          w=w,MaxIter=100,seg.id=seg.id,nagg=nagg)
     # b.gamma=b.true
     
     #sample z
-    # z=sample.z(betas=betas,xmat=xmat,ysoma=ysoma,b.gamma=b.gamma,
-    #            seg.id=seg.id,ngroup=ngroup,nagg=nagg,theta=theta)
-    z=z.true
+    z=sample.z(betas=betas,xmat=xmat,ysoma=ysoma,b.gamma=b.gamma,
+               seg.id=seg.id,ngroup=ngroup,nagg=nagg,theta=theta)
+    # z=z.true
     
     #sample theta
     theta=rep(1/ngroup,ngroup)

@@ -59,5 +59,17 @@ Ideas
 1) Should I start with b.gamma=1 (little variance) to better estimate betas. Doesn't work
 #---------------------------
 Big idea: revert back to a single b.gamma for all groups now that we are not estimating the number of groups anymore
+#---------------------------
+June 9th
 
+If we know z and we know b.gamma, then we can estimate betas well
+If we know z, then can we estimate b.gamma and betas well?
+
+Why do I see big dips in llk?
+Could it be that the function for b.gamma somehow is modifying betas?
+Could it be that the function for betas somehow is modifying b.gamma?
+#-------------------------------------------
+Something is wrong with my slice sampler for betas.
+
+Perhaps I should simplify my calculation of loglikel. This would make the algorithm slower but simpler.
 
