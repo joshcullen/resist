@@ -1,25 +1,25 @@
 rm(list=ls())
-set.seed(135)
+set.seed(21)
 
 setwd('U:\\GIT_models\\resist')
 n=50000
 nparam=3
-xmat=matrix(runif(n*nparam,min=-1.5,max=1.5),n,nparam)
+xmat=matrix(runif(n*nparam,min=-2,max=2),n,nparam)
 nomes.cov=paste0('covs',1:nparam)
 colnames(xmat)=nomes.cov
 n=nrow(xmat)
 
 ngroup=4
-betas.true=betas=matrix(c(-1,0 , 1, 2,# 0, 1, 0,
-                           1,0 , 1,-1,# 1, 0,-1,
-                          -1,-1, 0, 0,# 0,-1, 0,
-                           0, 0,-1, 1),#,-1, 0, 1),
-                           nparam+1,ngroup,byrow=T)
+betas.true=betas=matrix(c( 2, 0 ,1,-2,
+                           0, 2, 0,-1,
+                          -1, 0, 0, 0,
+                           0, 0, 2, 0),nparam+1,ngroup,byrow=T)
 media=exp(cbind(1,xmat)%*%betas); range(round(media,3))
 
-b.true=b=1
-a=b*media
-ymat=matrix(rgamma(n*ngroup,a,b),n,ngroup); range(ymat)
+b.true=b=rep(1,ngroup)
+bmat=matrix(b,n,ngroup,byrow=T)
+a=bmat*media
+ymat=matrix(rgamma(n*ngroup,a,b),n,ngroup); 
 
 fim=as.data.frame(xmat)
 fim$z=NA
@@ -27,7 +27,7 @@ fim$ysoma=NA
 fim$seg.id=NA
 
 #aggregate these data
-ind=floor(c(seq(from=1,to=n,by=n/1000),n+1)) #has to include 1 and n to use all observations
+ind=floor(c(seq(from=1,to=n,by=n/5000),n+1)) #has to include 1 and n to use all observations
 for (i in 2:length(ind)){
   seq1=ind[i-1]:(ind[i]-1)
   n=length(seq1)
@@ -39,6 +39,7 @@ for (i in 2:length(ind)){
 }
 max(fim$seg.id)
 length(unique(fim$seg.id))
+range(fim$ysoma,na.rm=T)
 
 #get z.true
 tmp=unique(fim[,c('z','seg.id')])

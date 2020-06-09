@@ -37,3 +37,27 @@ What if we assume just 4 behaviors to begin with and don't estimate theta? Still
 Change intercepts in fake data and change initial values for b.gamma (to have higher variances): it worked!
 
 Assume we have 10 behaviors. Does it still work? Nope. 
+#--------------------------------
+change the number of observations per group. Aside from changing betas, this should help better discriminate groups.
+
+Things work well when we have z.true but I can see very slow convergence for betas. it seems that all parts of the algorithm move well across parameter space except for sample_betas. 
+
+Implement slice sampler for betas
+#------------------
+June 8th
+
+When z's are unknown, things don't work
+a) is this because the function sample.z is bad? Doesn't seem so. When we fix b.gamma and betas, we are able to correctly estimate z's.
+
+Current code works assuming that z's are known. 
+1) Does it really work to jointly estimate betas and b.gammas? Check correlation between betas and b.gammmas (assuming z's are known). No correlation. 
+
+If I fix z and b.gammas, would I be able to estimate betas? Yes.
+If I fix z and betas, would I be able to estimate b.gamma? Yes.
+
+Ideas
+1) Should I start with b.gamma=1 (little variance) to better estimate betas. Doesn't work
+#---------------------------
+Big idea: revert back to a single b.gamma for all groups now that we are not estimating the number of groups anymore
+
+
