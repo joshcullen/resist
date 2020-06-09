@@ -5,42 +5,38 @@ gibbs_resist=function(ysoma,xmat,seg.id,ngroup,ngibbs,nburn,gamma1,var.betas,w,M
   
   #initial parameters
   betas=matrix(0,nparam,ngroup)
-  betas[1,]=log(mean(ysoma))
-  b.gamma=rep(1,ngroup)
+  b.gamma=1
   z=sample(1:ngroup,size=nagg,replace=T)
   theta=rep(1/ngroup,ngroup)
   
   #stuff for gibbs sampler
-  jump1=list(betas=matrix(0.1,nparam,ngroup),b.gamma=rep(0.1,ngroup))
-  accept1=list(betas=matrix(0,nparam,ngroup),b.gamma=rep(0,ngroup))
+  jump1=list(betas=matrix(0.1,nparam,ngroup))
+  accept1=list(betas=matrix(0,nparam,ngroup))
+  accept.output=50  
   store.betas=matrix(NA,ngibbs,nparam*ngroup)
-  store.b=matrix(NA,ngibbs,ngroup)
+  store.b=matrix(NA,ngibbs,1)
   store.theta=matrix(NA,ngibbs,ngroup)
   store.llk=matrix(NA,ngibbs,1)
-  accept.output=50
-  
+
   for (i in 1:ngibbs){
     print(i)
     
-    #sample betas
+    #sample betas    
+    tmp=sample.betas(betas=betas,xmat=xmat,ysoma=ysoma,jump=jump1$betas,
+                     b.gamma=b.gamma,nparam=nparam,var.betas=var.betas,
+                     seg.id=seg.id,ngroup=ngroup,nagg=nagg,z=z)
+    betas=tmp$betas
+    accept1$betas=accept1$betas+tmp$accept
     # betas=Sample_betas(ngroups=ngroup,nparam=nparam,xmat=xmat,z=z,
     #                    ysoma=ysoma,betas=betas,b.gamma=b.gamma,var.betas=var.betas,
     #                    w=w,MaxIter=MaxIter,seg.id=seg.id,nagg=nagg)
-    # tmp=sample.betas(betas=betas,xmat=xmat,ysoma=ysoma,jump=jump1$betas,
-    #                  b.gamma=b.gamma,nparam=nparam,var.betas=var.betas,
-    #                  seg.id=seg.id,ngroup=ngroup,nagg=nagg,z=z)
-    # betas=tmp$betas
-    # accept1$betas=accept1$betas+tmp$accept
-    betas=betas.true
+    
+    # betas=betas.true
     
     #sample b.gamma
     b.gamma=Sample_bgamma(ngroups=ngroup,nparam=nparam,xmat=xmat,
                           z=z,ysoma=ysoma,betas=betas,b.gamma=b.gamma,
                           w=w,MaxIter=MaxIter,seg.id=seg.id,nagg=nagg)
-    # tmp=sample.b.gamma(betas=betas,xmat=xmat,ysoma=ysoma,jump=jump1$b.gamma,
-    #                    b.gamma=b.gamma,seg.id=seg.id,ngroup=ngroup,nagg=nagg,z=z)
-    # b.gamma=tmp$b.gamma
-    # accept1$b.gamma=accept1$b.gamma+tmp$accept
     # b.gamma=b.true
     
     #sample z
@@ -66,7 +62,7 @@ gibbs_resist=function(ysoma,xmat,seg.id,ngroup,ngibbs,nburn,gamma1,var.betas,w,M
     
     #store results
     store.betas[i,]=betas
-    store.b[i,]=b.gamma
+    store.b[i]=b.gamma
     store.llk[i]=sum(llk1)
     store.theta[i,]=theta
     z.estim=z

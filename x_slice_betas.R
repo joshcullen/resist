@@ -64,19 +64,19 @@ Sample_betas=function(ngroups,nparam,xmat,z,ysoma,betas,b.gamma,var.betas,w,MaxI
       cond.z=z==i
 
       #define upper bound
-      upper1=llk_betas(xmat=xmat,ysoma=ysoma,betas1=betas[,i],b.gamma=b.gamma[i],var.betas=var.betas,
+      upper1=llk_betas(xmat=xmat,ysoma=ysoma,betas1=betas[,i],b.gamma=b.gamma,var.betas=var.betas,
                        seg.id=seg.id,cond.z=cond.z,nagg=nagg)
       yslice=upper1-rexp(1);
       
       #define slice
       rango1=Doubling_Betas(xmat=xmat,betas1=betas[,i],target.beta=j,w=w,
-                            b.gamma=b.gamma[i],yslice=yslice,MaxIter=MaxIter,ysoma=ysoma,
+                            b.gamma=b.gamma,yslice=yslice,MaxIter=MaxIter,ysoma=ysoma,
                             seg.id=seg.id,cond.z=cond.z,nagg=nagg)
       
       #sample this particular parameter
       tmp=Shrink_Sample_Betas(rango1=rango1,yslice=yslice,MaxIter=MaxIter,
                               betas1=betas[,i],target.beta=j,ysoma=ysoma,xmat=xmat,
-                              seg.id=seg.id,nagg=nagg,b.gamma=b.gamma[i],cond.z=cond.z) 
+                              seg.id=seg.id,nagg=nagg,b.gamma=b.gamma,cond.z=cond.z) 
       betas[,i]=tmp
     }
   }

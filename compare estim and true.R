@@ -12,7 +12,7 @@ k
 #look at overall convergence
 par(mfrow=c(1,1))
 plot(store.llk,type='l')
-nburn=200
+nburn=900
 abline(v=nburn,col='red')
 plot(store.llk[nburn:ngibbs],type='l')
 
@@ -23,12 +23,9 @@ for (i in 1:9) plot(store.betas[1:ngibbs,ind[i]],type='l')
 for (i in 1:9) plot(store.betas[nburn:ngibbs,ind[i]],type='l')
 
 #look at convergence of b.gammas
-par(mfrow=c(2,ceiling(ngroup/2)))
-for (i in 1:ngroup) plot(store.b[,i],type='l')
-for (i in 1:ngroup) {
-  plot(store.b[nburn:ngibbs,i],type='l')
-  abline(h=b.true[i],col='red')
-}
+par(mfrow=c(1,1))
+plot(store.b,type='l')
+abline(h=b.true,col='red')
 
 #look at z's
 fim=data.frame(z.estim=z.estim,z.true=z.true)
