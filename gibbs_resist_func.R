@@ -31,6 +31,40 @@ sample.betas=function(betas,xmat,ysoma,jump,nparam,b.gamma,var.betas,seg.id,z,ng
   list(accept=accept,betas=betas.old)
 }
 #--------------------------------------------
+sample.betas.joint=function(betas,xmat,ysoma,nparam,b.gamma,var.betas,seg.id,
+                            z,ngroup,nagg,var1){
+  betas.old=betas.new=betas
+  for (i in 1:ngroup){
+    betas.new[,i]=rmvnorm(1,mean=betas.old[,i],sigma=var1[[i]])
+  }
+
+  pold=get.llk(betas=betas.old,xmat=xmat,ysoma=ysoma,
+               b.gamma=b.gamma,seg.id=seg.id,ngroup=ngroup,nagg=nagg)
+  pnew=get.llk(betas=betas.new,xmat=xmat,ysoma=ysoma,
+               b.gamma=b.gamma,seg.id=seg.id,ngroup=ngroup,nagg=nagg)
+    
+  #get priors
+  var.betas1=matrix(var.betas,nparam,ngroup)
+  prior.old =apply(dnorm(betas.old,mean=0,sd=sqrt(var.betas1),log=T),2,sum)
+  prior.new=apply(dnorm(betas.new,mean=0,sd=sqrt(var.betas1),log=T),2,sum)
+    
+  #sum the loglikel for the correct group
+  pold1=GetSomaLlkGroups(llk=pold, z=z-1, ngroups=ngroup)
+  pnew1=GetSomaLlkGroups(llk=pnew, z=z-1, ngroups=ngroup)
+    
+  #MH algorithm
+  pold2=pold1+prior.old
+  pnew2=pnew1+prior.new
+  pthresh=exp(pnew2-pold2)
+  cond=runif(ngroup)<pthresh
+  betas.old[,cond]=betas.new[,cond]
+
+  accept=rep(0,ngroup)
+  accept[cond]=1
+
+  list(accept=accept,betas=betas.old)
+}
+#--------------------------------------------
 get.llk=function(betas,xmat,ysoma,b.gamma,seg.id,nagg,ngroup){
   media=exp(xmat%*%betas)
   soma.media1=GetSomaMediaAllGroups(media=media, ngroups=ngroup, nysoma=nagg,SegID=seg.id-1)

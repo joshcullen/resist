@@ -73,3 +73,10 @@ Something is wrong with my slice sampler for betas.
 
 Perhaps I should simplify my calculation of loglikel. This would make the algorithm slower but simpler.
 
+If this works, I can work on speeding up the function llk_betas()
+
+I can't make the slice sampler for betas work.
+#----------------------------------------------
+resistance model: implement joint sampling of betas using a multivariate normal distribution? implement HMC or MALAS?
+
+Joint sampling does not work. Not sure why.

@@ -6,13 +6,13 @@ store.theta=mod.res$theta
 
 #look at correlation
 k=cor(cbind(store.b,store.betas))
-k[k < 0.5 | k > -0.5]=NA
+k[k < 0.5 & k > -0.5]=NA
 k
 
 #look at overall convergence
 par(mfrow=c(1,1))
 plot(store.llk,type='l')
-nburn=900
+nburn=400
 abline(v=nburn,col='red')
 plot(store.llk[nburn:ngibbs],type='l')
 

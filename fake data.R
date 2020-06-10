@@ -1,5 +1,5 @@
 rm(list=ls())
-set.seed(28)
+set.seed(3)
 
 setwd('U:\\GIT_models\\resist')
 n=50000
@@ -11,9 +11,9 @@ n=nrow(xmat)
 
 ngroup=4
 betas.true=betas=matrix(c( 2, 0 ,1,-2,
-                           0, 2, 0,-1,
+                           0, -2, 0,-1,
                           -1, 0, 0, 0,
-                           0, 0, 2, 0),nparam+1,ngroup,byrow=T)
+                           0, 0, -2, 0),nparam+1,ngroup,byrow=T)
 media=exp(cbind(1,xmat)%*%betas); range(round(media,3))
 
 b.true=b=2

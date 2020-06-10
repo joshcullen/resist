@@ -8,10 +8,18 @@ gibbs_resist=function(ysoma,xmat,seg.id,ngroup,ngibbs,nburn,gamma1,var.betas,w,M
   b.gamma=1
   z=sample(1:ngroup,size=nagg,replace=T)
   theta=rep(1/ngroup,ngroup)
+  tmp=diag(1,nparam)
+  
+  #for joint sampling of betas
+  var1=list()
+  for (jj in 1:ngroup){
+    var1[[jj]]=tmp
+  }
+  ind.betas=matrix(1:(nparam*ngroup),nparam,ngroup)
   
   #stuff for gibbs sampler
-  jump1=list(betas=matrix(0.1,nparam,ngroup))
-  accept1=list(betas=matrix(0,nparam,ngroup))
+  jump1=list(betas=matrix(0.1,nparam,ngroup),betas.joint=rep(1,ngroup))
+  accept1=list(betas=matrix(0,nparam,ngroup),betas.joint=rep(0,ngroup))
   accept.output=50  
   store.betas=matrix(NA,ngibbs,nparam*ngroup)
   store.b=matrix(NA,ngibbs,1)
@@ -27,9 +35,12 @@ gibbs_resist=function(ysoma,xmat,seg.id,ngroup,ngibbs,nburn,gamma1,var.betas,w,M
                      seg.id=seg.id,ngroup=ngroup,nagg=nagg,z=z)
     betas=tmp$betas
     accept1$betas=accept1$betas+tmp$accept
-    # betas=Sample_betas(ngroups=ngroup,nparam=nparam,xmat=xmat,z=z,
-    #                    ysoma=ysoma,betas=betas,b.gamma=b.gamma,var.betas=var.betas,
-    #                    w=w,MaxIter=MaxIter,seg.id=seg.id,nagg=nagg)
+    
+    tmp=sample.betas.joint(betas=betas,xmat=xmat,ysoma=ysoma,
+                           b.gamma=b.gamma,nparam=nparam,var.betas=var.betas,
+                           seg.id=seg.id,ngroup=ngroup,nagg=nagg,z=z,var1=var1)
+    betas=tmp$betas
+    accept1$betas.joint=accept1$betas.joint+tmp$accept
     
     # betas=betas.true
     
@@ -58,6 +69,12 @@ gibbs_resist=function(ysoma,xmat,seg.id,ngroup,ngibbs,nburn,gamma1,var.betas,w,M
       k=print.adapt(accept1z=accept1,jump1z=jump1,accept.output=accept.output)
       accept1=k$accept1
       jump1=k$jump1
+      
+      #get correlation structure from posterior samples
+      for (jj in 1:ngroup){
+        seq1=(i-accept.output+1):(i-1)
+        var1[[jj]]=var(store.betas[seq1,ind.betas[,jj]])  
+      }
     }
     
     #store results
