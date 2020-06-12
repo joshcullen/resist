@@ -15,7 +15,7 @@ plot(store.b[nburn:ngibbs],type='l')
 acf(store.b[nburn:ngibbs])
 
 #look at convergence betas
-par(mfrow=c(3,3),mar=rep(1,4))
+par(mfrow=c(3,2),mar=rep(1,4))
 ind=sample(1:ncol(store.betas),size=9)
 for (i in 1:9) plot(store.betas[1:ngibbs,ind[i]],type='l')
 for (i in 1:9) plot(store.betas[nburn:ngibbs,ind[i]],type='l')
@@ -31,11 +31,11 @@ for (i in 1:9) plot(store.betas[nburn:ngibbs,ind[i]],type='l')
 # tab1[ordem,]
 
 #look at betas
-ngroup=10
+ngroup=3
 par(mfrow=c(1,1),mar=rep(3,4))
 betas.estim=matrix(store.betas[ngibbs,],ncol(store.betas)/ngroup,ngroup)
-boxplot(store.betas[nburn:ngibbs, seq(1, 20, by = 2)])  #intercepts
-boxplot(store.betas[nburn:ngibbs, seq(2, 20, by = 2)])  #slopes
+boxplot(store.betas[nburn:ngibbs, seq(1, ncol(store.betas), by = 2)])  #intercepts
+boxplot(store.betas[nburn:ngibbs, seq(2, ncol(store.betas), by = 2)])  #slopes
 
 #look at theta
 boxplot(mod.res$theta[nburn:ngibbs,])
