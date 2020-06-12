@@ -1,13 +1,13 @@
-rm(list=ls())
 library('Rcpp')
 library('mvtnorm')
 set.seed(61)
 
-setwd('U:\\GIT_models\\resist')
 source('gibbs_resist.R')
 source('gibbs_resist_func.R')
 source('slice_b_gamma.R')
 sourceCpp('resist_aux.cpp')
+
+
 dat=read.csv('fake data.csv',as.is=T)
 ind=grep('cov',colnames(dat))
 xmat=data.matrix(cbind(1,dat[,ind]))
