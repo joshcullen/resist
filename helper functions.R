@@ -32,17 +32,21 @@ df.to.list = function(dat, ind) {  #ind must be in quotes
 # }
 
 #----------------------------
-extract.covars = function(dat.N, dist2rdN_30m, crs) {
+extract.covars = function(dat, layers) {
   
   path<- list()
-  ind<- unique(dat.N$id)
+  ind<- unique(dat$id)
   
-  for (i in 1:length(unique(dat.N$id))) {
+  for (i in 1:n_distinct(dat$id)) {
     
     #Subset and prep data
-    tmp<- dat.N[dat.N$id == ind[i],]
-    tmp<- tmp %>% 
-      mutate(dt = difftime(date, lag(date), units = "sec"))
+    tmp<- dat %>% 
+      dplyr::filter(id == ind[i]) %>% 
+      dplyr::mutate(dt = difftime(date, dplyr::lag(date, 1), units = "secs")) %>% 
+      dplyr::mutate_at("dt", {. %>% 
+          as.numeric() %>%
+          round()})
+    tmp$dt<- c(purrr::discard(tmp$dt, is.na), NA)
     
     extr.covar<- data.frame()
     
@@ -51,14 +55,15 @@ extract.covars = function(dat.N, dist2rdN_30m, crs) {
       segment<- tmp[(j-1):j, c("x","y")] %>%
         as.matrix() %>% 
         st_linestring() %>% 
-        st_sfc(crs = "+init=epsg:32721") %>% 
+        st_sfc(crs = projection(layers)) %>% 
         st_sf()
       
-      tmp1<- raster::extract(dist2rdN_30m, segment, along = TRUE, cellnumbers = TRUE) %>% 
+      tmp1<- raster::extract(layers, segment, along = TRUE, cellnumbers = FALSE) %>% 
+        purrr::map(., ~matrix(., ncol = nlayers(layers))) %>% 
         map_dfr(., as_data_frame, .id = "seg.id") %>% 
-        mutate(dt = NA, id = ind[i]) %>% 
-        mutate(seg.id = j-1)
-      tmp1[nrow(tmp1),"dt"]<- as.numeric(tmp$dt[j])
+        mutate(seg.id = j-1, dt = NA, id = ind[i], date = tmp$date[j-1])
+      tmp1[nrow(tmp1),"dt"]<- as.numeric(tmp$dt[j-1])
+      names(tmp1)[2:(1 + nlayers(layers))]<- names(layers)
       
       extr.covar<- rbind(extr.covar, tmp1)
     }

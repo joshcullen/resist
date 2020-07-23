@@ -1,0 +1,95 @@
+---
+title: "Resistance Model of Armadillo Movement"
+author: "Josh Cullen"
+date: "`r format(Sys.time(), '%d %B %Y')`"
+output:
+  pdf_document: 
+    fig_caption: yes
+    latex_engine: xelatex
+header-includes:
+  - \usepackage{float}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+```
+
+# Background
+
+Resistance models are often used to evaluate connectivity across a landscape and to understand why animals use certain corridors. Many measures of resistance are often calculated using an inverse measure of habitat suitability or based on some other known index that would impede animal movement. However, these models do not include a measure of the time it takes to traverse different landscape features. We propose a new model that focuses on time to cross a landscape using multiple covariates in a behavior-specific fashion. This current framework requires the user to specify the number of behaviors that they expect and to perform multimodel inference if unsure of the number of true behaviors.
+
+As an empirical example, measures of resistance will be calculated for 20 armadillos from two separate regions of the Pantanal in Brazil using distance to nearest road as the only covariate of interest.
+
+```{r, load data}
+### Load armadillo telemetry data
+
+library(tidyverse)
+library(sf)
+library(raster)
+library(lubridate)
+library(sp)
+
+source('helper functions.R')
+
+###################
+### Import data ###
+###################
+
+setwd("~/Documents/Snail Kite Project/Data/armadillos")
+
+dat<- read.csv("Modified Armadillo Data.csv", header = T, sep = ",")
+
+dat$id<- as.character(dat$id)
+dat$date<- as_datetime(dat$date)
+
+# Separate tracks by region (N or S)
+dat.N<- dat %>% filter(region == "N")
+dat.S<- dat %>% filter(region == "S")
+```
+
+```{r, load rasters}
+# Read in rasters
+setwd("~/Documents/Snail Kite Project/Data/armadillos/Environ Data")
+
+rast<- dir(getwd(), "*.tif$")
+for (i in rast) assign(i, raster(i))
+
+#Need to project rasters same as tracks
+EucDist_cerc_Copy.tif<- projectRaster(EucDist_cerc_Copy.tif, crs = "+init=epsg:32721")
+crs(EucDist_cercaAm.tif)<- crs(EucDist_cerc_Copy.tif)
+
+
+## Aggregate spatial data to same scale (which will likely be 30m)
+res(EucDist_cercaAm.tif) #1m 1m
+dist2rdS_30m<- raster::aggregate(EucDist_cercaAm.tif,
+                                 fact = 30,
+                                 fun = mean)
+
+res(EucDist_cerc_Copy.tif) #13m 13m
+#create dummy raster at same extent and proj, but with desired resolution
+ex.ras<- raster(ext = extent(EucDist_cerc_Copy.tif), crs = "+init=epsg:32721", res = 30)
+dist2rdN_30m<- resample(EucDist_cerc_Copy.tif, ex.ras, method = "bilinear")
+```
+
+```{r, fig.align='center', fig.width=7, fig.height=5, fig.pos='H', fig.cap="Tracks for each of armadillos in the northern (top) and southern (bottom) regions of the Pantanal."}
+ggplot() +
+  geom_path(data = dat.N, aes(x, y, color = id), size = 0.5) +
+  theme_bw() +
+  coord_cartesian()
+
+ggplot() +
+  geom_path(data = dat.S, aes(x, y, color = id), size = 0.5) +
+  theme_bw() +
+  coord_cartesian()
+
+```
+
+```{r, fig.align='center', fig.width=7, fig.height=5, fig.pos='H', fig.cap="Rasters that show distance to nearest road for the northern (left) and southern (right) regions of the Pantanal."}
+par(mfrow=c(1,2))
+
+plot(dist2rdN_30m); points(dat.N$x, dat.N$y)
+plot(dist2rdS_30m); points(dat.S$x, dat.S$y)
+
+par(mfrow=c(1,1))
+```
+

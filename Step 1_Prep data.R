@@ -5,6 +5,8 @@ library(sf)
 library(raster)
 library(lubridate)
 library(sp)
+library(tictoc)
+library(lunar)
 
 source('helper functions.R')
 
@@ -24,13 +26,15 @@ dat.N<- dat %>% filter(region == "N")
 dat.S<- dat %>% filter(region == "S")
 
 
-# Read in rasters
+####################################
+### Import distance-to-road data ###
+####################################
+
 setwd("~/Documents/Snail Kite Project/Data/armadillos/Environ Data")
 
 rast<- dir(getwd(), "*.tif$")
 for (i in rast) assign(i, raster(i))
 
-plot(classes_DL_padrao.tif)
 plot(EucDist_cerc_Copy.tif); points(dat.N$x, dat.N$y)
 plot(EucDist_cercaAm.tif); points(dat.S$x, dat.S$y)
 
@@ -54,16 +58,73 @@ dist2rdN_30m<- resample(EucDist_cerc_Copy.tif, ex.ras, method = "bilinear")
 #                                  fun = mean)
 
 
+
+
+###################
+### Import DEMs ###
+###################
+
+#resample DEMs to 30m from 18m; they will now share the same dimensions and extent
+dem.N<- resample(dem_N.tif, dist2rdN_30m, method = "bilinear")
+compareRaster(dist2rdN_30m, dem.N)  #check if same extent, dimensions, projection, resolution,
+                                    #and origin
+plot(dist2rdN_30m); plot(dem.N, add=T); points(dat.N$x, dat.N$y)
+
+#resample DEMs to 30m from 18m; they will now share the same dimensions and extent
+dem.S<- resample(dem_S.tif, dist2rdS_30m, method = "bilinear")
+compareRaster(dist2rdS_30m, dem.S)
+plot(dist2rdS_30m); plot(dem.S, add=T); points(dat.S$x, dat.S$y)
+
+
+
+##########################
+### Import NDVI layers ###
+##########################
+
+setwd("~/Documents/Snail Kite Project/Data/armadillos/NDVI")
+
+#load files
+ndvi.filenames<- list.files(getwd(), pattern = "*.grd$")
+ndvi.N<- brick(ndvi.filenames[1])
+ndvi.S<- brick(ndvi.filenames[2])
+
+#change extent and dimensions of RasterBricks using resample()
+ndvi.N<- resample(ndvi.N, dist2rdN_30m, method = "bilinear")
+compareRaster(dist2rdN_30m, ndvi.N)
+plot(dist2rdN_30m); plot(ndvi.N[[1]], add=T); points(dat.N$x, dat.N$y)
+
+#change extent and dimensions of RasterBricks using resample()
+ndvi.S<- resample(ndvi.S, dist2rdS_30m, method = "bilinear")
+compareRaster(dist2rdS_30m, ndvi.S)
+plot(dist2rdS_30m); plot(ndvi.S[[1]], add=T); points(dat.S$x, dat.S$y)
+
+
+### *TEMPORARY* take mean NDVI for all rasters over study period at each site
+ndvi.N.mean<- mean(ndvi.N, na.rm = T)
+ndvi.S.mean<- mean(ndvi.S, na.rm = T)
+
+
+###########################################
+### Merge static covars as RasterBricks ###
+###########################################
+
+covars.N<- brick(dist2rdN_30m, dem.N, ndvi.N.mean)
+names(covars.N)<- c("dist2rd", "elev", "ndvi")
+
+covars.S<- brick(dist2rdS_30m, dem.S, ndvi.S.mean)
+names(covars.S)<- c("dist2rd", "elev", "ndvi")
+
+
 #######################################################
 ### Extract values from raster layer for each track ###
 #######################################################
+tic()
+path.N<- extract.covars(dat.N, covars.N)
+toc()
 
-path.N<- extract.covars(dat.N, dist2rdN_30m, crs = "+init=epsg:32721")
-path.S<- extract.covars(dat.S, dist2rdS_30m, crs = "+init=epsg:32721")
-
-names(path.N)[3]<- "dist2rd"
-names(path.S)[3]<- "dist2rd"
-
+tic()
+path.S<- extract.covars(dat.S, covars.S)
+toc()
 
 #double-check that extracted grid cells overlap with tracks
 
@@ -104,6 +165,23 @@ ggplot() +
   theme_bw()
 
 
+
+##############################
+### Add lunar illumination ###
+##############################
+
+path.N$lunar<- lunar.illumination(path.N$date, shift = 12)
+path.S$lunar<- lunar.illumination(path.S$date, shift = 12)
+
+
+#############################################
+### Explore relationships among variables ###
+#############################################
+
+PerformanceAnalytics::chart.Correlation(path.N[,c(2:4,8)])  #no strong corrs
+PerformanceAnalytics::chart.Correlation(path.S[,c(2:4,8)])  #strong corr between dist2rd and elev
+
+
 ##############################
 ### Modify and export data ###
 ##############################
@@ -124,3 +202,5 @@ resist.dat<- rbind(path.N, path.S)
 # Export data
 setwd("~/Documents/Snail Kite Project/Data/R Scripts/ValleLabUF/resist")
 # write.csv(resist.dat, "Armadillo Resistance Data.csv", row.names = F)
+# write.csv(path.N, "N Armadillo Resistance Data.csv", row.names = F)
+# write.csv(path.S, "S Armadillo Resistance Data.csv", row.names = F)
