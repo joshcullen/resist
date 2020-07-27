@@ -27,7 +27,7 @@ Doubling_bgamma=function(soma.media,w,b.gamma,yslice,MaxIter,ysoma){
   c(b.gammaLo,b.gammaHi)
 }
 #-------------------------------------------
-llk_bgamma=function(soma.media,ysoma,b.gamma,z,ngroups){
+llk_bgamma=function(soma.media,ysoma,b.gamma){
   a1=b.gamma*soma.media
   sum(dgamma(ysoma,a1,b.gamma,log=T))
 }
@@ -51,24 +51,18 @@ Shrink_Sample_bgamma=function(rango1,yslice,MaxIter,soma.media,ysoma,b.gamma){
   x
 }
 #-------------------------------------------
-Sample_bgamma=function(ngroups,nparam,xmat,z,ysoma,betas,b.gamma,w,MaxIter,seg.id,nagg){
+Sample_bgamma=function(nparam,xmat,ysoma,betas,b.gamma,w,MaxIter,seg.id,nagg){
   media=exp(xmat%*%betas)
-  soma.media=GetSomaMediaAllGroups(media=media, ngroups=ngroups, 
-                                   nysoma=nagg,SegID=seg.id-1)
-  soma.media1=rep(NA,nagg)
-  for (i in 1:ngroups){
-    cond=z==i
-    soma.media1[cond]=soma.media[cond,i]
-  }
-  
+  soma.media1=GetSomaMediaOneGroup(media=media, nagg=nagg,SegID=seg.id-1)
+
   #define upper bound
   upper1=llk_bgamma(soma.media=soma.media1,ysoma=ysoma,b.gamma=b.gamma)
   yslice=upper1-rexp(1);
-  
+    
   #define slice
   rango1=Doubling_bgamma(soma.media=soma.media1,w=w,b.gamma=b.gamma,
                          yslice=yslice,MaxIter=MaxIter,ysoma=ysoma)
-  
+
   #sample this particular parameter
   b.gamma=Shrink_Sample_bgamma(rango1=rango1,yslice=yslice,MaxIter=MaxIter,
                                soma.media=soma.media1,ysoma=ysoma,
