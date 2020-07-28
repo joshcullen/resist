@@ -25,6 +25,10 @@ dat$date<- as_datetime(dat$date)
 dat.N<- dat %>% filter(region == "N")
 dat.S<- dat %>% filter(region == "S")
 
+# Remove burrow locations
+# dat.N<- dat.N %>% filter(InBurrow != 1)
+# dat.S<- dat.S %>% filter(InBurrow != 1)
+
 
 ####################################
 ### Import distance-to-road data ###
@@ -202,5 +206,9 @@ resist.dat<- rbind(path.N, path.S)
 # Export data
 setwd("~/Documents/Snail Kite Project/Data/R Scripts/ValleLabUF/resist")
 # write.csv(resist.dat, "Armadillo Resistance Data.csv", row.names = F)
+
 # write.csv(path.N, "N Armadillo Resistance Data.csv", row.names = F)
 # write.csv(path.S, "S Armadillo Resistance Data.csv", row.names = F)
+
+# write.csv(path.N, "N Armadillo Resistance Data_NoBurrow.csv", row.names = F)
+# write.csv(path.S, "S Armadillo Resistance Data_NoBurrow.csv", row.names = F)

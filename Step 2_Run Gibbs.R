@@ -10,9 +10,16 @@ source('gibbs_resist_func.R')
 source('slice_b_gamma.R')
 sourceCpp('resist_aux.cpp')
 
+# All armadillos
 # dat<- read.csv('Armadillo Resistance Data.csv', as.is=T)
-path.N<- read.csv('N Armadillo Resistance Data.csv', as.is=T)
-path.S<- read.csv('S Armadillo Resistance Data.csv', as.is=T)
+
+# N and S IDs separated
+# path.N<- read.csv('N Armadillo Resistance Data.csv', as.is=T)
+# path.S<- read.csv('S Armadillo Resistance Data.csv', as.is=T)
+
+# N and S IDs separated and burrow locs removed
+path.N<- read.csv('N Armadillo Resistance Data_NoBurrow.csv', as.is=T)
+path.S<- read.csv('S Armadillo Resistance Data_NoBurrow.csv', as.is=T)
 
 # #set to mean = 0 and sd = 1
 # dat<- dat %>% 
