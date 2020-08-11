@@ -18,6 +18,9 @@ setwd("~/Documents/Snail Kite Project/Data/armadillos")
 
 dat<- read.csv("Modified Armadillo Data.csv", header = T, sep = ",")
 
+# dat.noBurrow<- dat %>% filter(dist != 0)  #w/o burrow locs
+# write.csv(dat.noBurrow, "Armadillo Data_NoBurrow.csv", row.names = F)
+
 dat$id<- as.character(dat$id)
 dat$date<- as_datetime(dat$date)
 
