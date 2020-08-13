@@ -47,8 +47,15 @@ ggplot(store.betas.long_N, aes(x=betas, y=value)) +
         axis.text = element_text(size = 12),
         legend.title = element_text(size = 12))
 
-
-
+# w/o intercept
+ggplot(store.betas.long_N %>% filter(betas != "int"), aes(x=betas, y=value)) +
+  geom_boxplot(color="firebrick") +
+  geom_hline(yintercept = 0, size = 0.5) +
+  labs(x="Beta Coefficients", y="Value", title = "North Pantanal") +
+  theme_bw() +
+  theme(axis.title = element_text(size = 14),
+        axis.text = element_text(size = 12),
+        legend.title = element_text(size = 12))
 
 
 
@@ -104,3 +111,89 @@ ggplot(store.betas.long_S, aes(x=betas, y=value)) +
   theme(axis.title = element_text(size = 14),
         axis.text = element_text(size = 12),
         legend.title = element_text(size = 12))
+
+# w/o intercept
+ggplot(store.betas.long_S %>% filter(betas != "int"), aes(x=betas, y=value)) +
+  geom_boxplot(color="darkturquoise") +
+  geom_hline(yintercept = 0, size = 0.5) +
+  labs(x="Beta Coefficients", y="Value", title = "South Pantanal") +
+  theme_bw() +
+  theme(axis.title = element_text(size = 14),
+        axis.text = element_text(size = 12),
+        legend.title = element_text(size = 12))
+
+
+
+
+
+#### Create Predictive Surfaces (dist2rd, ndvi) ####
+
+## North Pantanal
+
+#extract beta coeffs (mean)
+betas_N<- colMeans(store.betas_N.df)
+
+#Need to center and scale raster values so comparable to beta coeffs
+covars.N2<- covars.N[[c("dist2rd","ndvi")]]
+covars.N2$dist2rd<- scale(covars.N2$dist2rd, center = T, scale = T)
+covars.N2$ndvi<- scale(covars.N2$ndvi, center = T, scale = T)
+
+
+#Perform raster math using beta coeffs (include intercept and beta coeff for lunar as constants)
+resist_surf_N<- exp(
+  betas_N["int"] + 
+  betas_N["dist2rd"]*covars.N2$dist2rd + 
+  betas_N["ndvi"]*covars.N2$ndvi + 
+  betas_N["lunar"]
+  )
+resist_surf_N_df<- as.data.frame(resist_surf_N, xy=T)
+plot(resist_surf_N)
+
+ggplot() +
+  geom_tile(data = resist_surf_N_df, aes(x, y, fill = layer)) +
+  scale_fill_viridis_c("Time Spent\nMoving (s)", option = "inferno", na.value = "n") +
+  geom_point(data = dat.N, aes(x, y, color = id)) +
+  scale_x_continuous(expand = c(0,0)) +
+  scale_y_continuous(expand = c(0,0)) +
+  labs(x="Easting", y="Northing", title = "North Pantanal Resistance Surface") +
+  theme_bw() +
+  coord_equal()
+
+
+
+
+
+
+
+
+
+## South Pantanal
+
+#extract beta coeffs (mean)
+betas_S<- colMeans(store.betas_S.df)
+
+#Need to center and scale raster values so comparable to beta coeffs
+covars.S2<- covars.S[[c("dist2rd","ndvi")]]
+covars.S2$dist2rd<- scale(covars.S2$dist2rd, center = T, scale = T)
+covars.S2$ndvi<- scale(covars.S2$ndvi, center = T, scale = T)
+
+
+#Perform raster math using beta coeffs (include intercept and beta coeff for lunar as constants)
+resist_surf_S<- exp(
+  betas_S["int"] + 
+    betas_S["dist2rd"]*covars.S2$dist2rd + 
+    betas_S["ndvi"]*covars.S2$ndvi + 
+    betas_S["lunar"]
+)
+resist_surf_S_df<- as.data.frame(resist_surf_S, xy=T)
+plot(resist_surf_S)
+
+ggplot() +
+  geom_tile(data = resist_surf_S_df, aes(x, y, fill = layer)) +
+  scale_fill_viridis_c("Time Spent\nMoving (s)", option = "inferno", na.value = "n") +
+  geom_point(data = dat.S, aes(x, y, color = id)) +
+  scale_x_continuous(expand = c(0,0)) +
+  scale_y_continuous(expand = c(0,0)) +
+  labs(x="Easting", y="Northing", title = "South Pantanal Resistance Surface") +
+  theme_bw() +
+  coord_equal()

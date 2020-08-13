@@ -21,6 +21,10 @@ sourceCpp('resist_aux.cpp')
 path.N<- read.csv('N Armadillo Resistance Data_NoBurrow.csv', as.is=T)
 path.S<- read.csv('S Armadillo Resistance Data_NoBurrow.csv', as.is=T)
 
+# N and S IDs separated for dispersal locs
+path.N<- read.csv('N Armadillo Resistance Data_dispersal.csv', as.is=T)
+path.S<- read.csv('S Armadillo Resistance Data_dispersal.csv', as.is=T)
+
 # #set to mean = 0 and sd = 1
 # dat<- dat %>% 
 #   mutate_at(c("dist2rd","elev","ndvi","lunar"), ~scale(., center = TRUE, scale = TRUE))
