@@ -65,6 +65,25 @@ dist2rdN_30m<- resample(EucDist_cerc_Copy.tif, ex.ras, method = "bilinear")
 #                                  fun = mean)
 
 
+# Create dummy rasters for extent of each region (with buffer) to crop down rasters
+
+#North
+rast.N<- raster(ext=extent(c(min(dat.N$x) - 30, max(dat.N$x) + 30, min(dat.N$y) - 30,
+                             max(dat.N$y + 30))),
+                crs = "+init=epsg:32721",
+                res = 30)
+values(rast.N)<- 0
+dist2rdN_30m<- crop(dist2rdN_30m, rast.N)
+plot(dist2rdN_30m); points(dat.N$x, dat.N$y)
+
+#South
+rast.S<- raster(ext=extent(c(min(dat.S$x) - 30, max(dat.S$x) + 30, min(dat.S$y) - 30,
+                             max(dat.S$y + 30))),
+                crs = "+init=epsg:32721",
+                res = 30)
+values(rast.S)<- 0
+dist2rdS_30m<- crop(dist2rdS_30m, rast.S)
+plot(dist2rdS_30m); points(dat.S$x, dat.S$y)
 
 
 ###################
@@ -75,12 +94,12 @@ dist2rdN_30m<- resample(EucDist_cerc_Copy.tif, ex.ras, method = "bilinear")
 dem.N<- resample(dem_N.tif, dist2rdN_30m, method = "bilinear")
 compareRaster(dist2rdN_30m, dem.N)  #check if same extent, dimensions, projection, resolution,
                                     #and origin
-plot(dist2rdN_30m); plot(dem.N, add=T); points(dat.N$x, dat.N$y)
+plot(dem.N); points(dat.N$x, dat.N$y)
 
 #resample DEMs to 30m from 18m; they will now share the same dimensions and extent
 dem.S<- resample(dem_S.tif, dist2rdS_30m, method = "bilinear")
 compareRaster(dist2rdS_30m, dem.S)
-plot(dist2rdS_30m); plot(dem.S, add=T); points(dat.S$x, dat.S$y)
+plot(dem.S); points(dat.S$x, dat.S$y)
 
 
 
@@ -98,12 +117,12 @@ ndvi.S<- brick(ndvi.filenames[2])
 #change extent and dimensions of RasterBricks using resample()
 ndvi.N<- resample(ndvi.N, dist2rdN_30m, method = "bilinear")
 compareRaster(dist2rdN_30m, ndvi.N)
-plot(dist2rdN_30m); plot(ndvi.N[[1]], add=T); points(dat.N$x, dat.N$y)
+plot(ndvi.N[[1]]); points(dat.N$x, dat.N$y)
 
 #change extent and dimensions of RasterBricks using resample()
 ndvi.S<- resample(ndvi.S, dist2rdS_30m, method = "bilinear")
 compareRaster(dist2rdS_30m, ndvi.S)
-plot(dist2rdS_30m); plot(ndvi.S[[1]], add=T); points(dat.S$x, dat.S$y)
+plot(ndvi.S[[1]]); points(dat.S$x, dat.S$y)
 
 
 ### *TEMPORARY* take mean NDVI for all rasters over study period at each site

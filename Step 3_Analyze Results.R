@@ -1,42 +1,15 @@
-######################
-### North Pantanal ###
-######################
+### Visualize Results from Best Models ###
 
-store.llk_N<- mod.res_N$llk
-store.b_N<- mod.res_N$b.gamma
-store.betas_N<- mod.res_N$betas
 
-#look at overall convergence
-plot(store.llk_N, type='l')
-nburn=500
-abline(v=nburn, col='red')
-plot(store.llk_N[(nburn + 1):ngibbs], type='l')
-acf(store.llk_N[(nburn + 1):ngibbs])
-
-plot(store.b_N, type='l')
-plot(store.b_N[(nburn + 1):ngibbs], type='l')
-acf(store.b_N[(nburn + 1):ngibbs])
-
-#look at convergence betas
-par(mfrow=c(2,2))
-nbetas_N<- ncol(mod.res_N$betas)
-for (i in 1:nbetas_N){
-  plot(mod.res_N$betas[,i], type='l')  
-}
-
-for (i in 1:nbetas_N){
-  plot(mod.res_N$betas[(nburn + 1):ngibbs, i], type='l')  
-}
-par(mfrow=c(1,1),mar=rep(3,4))
-
+### North Pantanal
 
 #look at betas (convert to data frame)
-store.betas_N.df<- data.frame(store.betas_N[(nburn+1):ngibbs, ])
+store.betas_N.df<- data.frame(store.betas_N1[(nburn+1):ngibbs, ])
 names(store.betas_N.df)<- c("int","dist2rd","ndvi","lunar")
 store.betas.long_N<- tidyr::pivot_longer(store.betas_N.df, cols = names(store.betas_N.df),
                                          names_to = "betas")
 store.betas.long_N$betas<- factor(store.betas.long_N$betas,
-                                   levels = names(store.betas_N.df)[1:4])
+                                   levels = names(store.betas_N.df))
 
 ggplot(store.betas.long_N, aes(x=betas, y=value)) +
   geom_boxplot(color="firebrick") +
@@ -62,46 +35,15 @@ ggplot(store.betas.long_N %>% filter(betas != "int"), aes(x=betas, y=value)) +
 
 
 
-
-######################
-### South Pantanal ###
-######################
-
-store.llk_S<- mod.res_S$llk
-store.b_S<- mod.res_S$b.gamma
-store.betas_S<- mod.res_S$betas
-
-#look at overall convergence
-plot(store.llk_S, type='l')
-nburn=500
-abline(v=nburn, col='red')
-plot(store.llk_S[(nburn + 1):ngibbs], type='l')
-acf(store.llk_S[(nburn + 1):ngibbs])
-
-plot(store.b_S, type='l')
-plot(store.b_S[(nburn + 1):ngibbs], type='l')
-acf(store.b_S[(nburn + 1):ngibbs])
-
-#look at convergence betas
-par(mfrow=c(2,2))
-nbetas_S<- ncol(mod.res_S$betas)
-for (i in 1:nbetas_S){
-  plot(mod.res_S$betas[,i], type='l')  
-}
-
-for (i in 1:nbetas_S){
-  plot(mod.res_S$betas[(nburn + 1):ngibbs, i], type='l')  
-}
-par(mfrow=c(1,1),mar=rep(3,4))
-
+### South Pantanal
 
 #look at betas (convert to data frame)
-store.betas_S.df<- data.frame(store.betas_S[(nburn+1):ngibbs, ])
-names(store.betas_S.df)<- c("int","dist2rd","ndvi","lunar")
+store.betas_S.df<- data.frame(store.betas_S2[(nburn+1):ngibbs, ])
+names(store.betas_S.df)<- c("int","dist2rd","ndvi","lunar","dist_ndvi")
 store.betas.long_S<- tidyr::pivot_longer(store.betas_S.df, cols = names(store.betas_S.df),
                                          names_to = "betas")
 store.betas.long_S$betas<- factor(store.betas.long_S$betas,
-                                  levels = names(store.betas_S.df)[1:4])
+                                  levels = names(store.betas_S.df))
 
 ggplot(store.betas.long_S, aes(x=betas, y=value)) +
   geom_boxplot(color="darkturquoise") +
@@ -126,7 +68,7 @@ ggplot(store.betas.long_S %>% filter(betas != "int"), aes(x=betas, y=value)) +
 
 
 
-#### Create Predictive Surfaces (dist2rd, ndvi) ####
+#### Create Predictive Surfaces (dist2rd, ndvi, lunar) ####
 
 ## North Pantanal
 
@@ -134,30 +76,74 @@ ggplot(store.betas.long_S %>% filter(betas != "int"), aes(x=betas, y=value)) +
 betas_N<- colMeans(store.betas_N.df)
 
 #Need to center and scale raster values so comparable to beta coeffs
+### IMPROVE CODE SINCE COVARS.N IS GENERATED WITHIN ANOTHER SCRIPT
 covars.N2<- covars.N[[c("dist2rd","ndvi")]]
 covars.N2$dist2rd<- scale(covars.N2$dist2rd, center = T, scale = T)
 covars.N2$ndvi<- scale(covars.N2$ndvi, center = T, scale = T)
 
+scaled_lunar_N<- path.N$lunar %>% 
+  scale(center = T, scale = T) %>% 
+  as.data.frame() %>% 
+  summarise(min=min(V1), mean=mean(V1), max=max(V1))
 
-#Perform raster math using beta coeffs (include intercept and beta coeff for lunar as constants)
-resist_surf_N<- exp(
+
+
+##Perform raster math using beta coeffs (include intercept and beta coeff for lunar as constants)
+
+#New moon
+resistSurfN_new<- exp(
   betas_N["int"] + 
   betas_N["dist2rd"]*covars.N2$dist2rd + 
   betas_N["ndvi"]*covars.N2$ndvi + 
-  betas_N["lunar"]
+  betas_N["lunar"]*scaled_lunar_N$min  #for new moon
   )
-resist_surf_N_df<- as.data.frame(resist_surf_N, xy=T)
-plot(resist_surf_N)
+resistSurfN_new.df<- as.data.frame(resistSurfN_new, xy=T) %>% 
+  mutate(phase = "New")
+
+#Quarter moon
+resistSurfN_quarter<- exp(
+  betas_N["int"] + 
+    betas_N["dist2rd"]*covars.N2$dist2rd + 
+    betas_N["ndvi"]*covars.N2$ndvi + 
+    betas_N["lunar"]*scaled_lunar_N$mean  #for quarter moon
+)
+resistSurfN_quarter.df<- as.data.frame(resistSurfN_quarter, xy=T) %>% 
+  mutate(phase = "Quarter")
+
+#Full moon
+resistSurfN_full<- exp(
+  betas_N["int"] + 
+    betas_N["dist2rd"]*covars.N2$dist2rd + 
+    betas_N["ndvi"]*covars.N2$ndvi + 
+    betas_N["lunar"]*scaled_lunar_N$max  #for full moon
+)
+resistSurfN_full.df<- as.data.frame(resistSurfN_full, xy=T) %>% 
+  mutate(phase = "Full")
+
+
+#Combine all results together for each level of lunar illumination
+resistSurfN.df<- rbind(resistSurfN_new.df, resistSurfN_quarter.df, resistSurfN_full.df)
+resistSurfN.df$phase<- factor(resistSurfN.df$phase, levels = c("New", "Quarter", "Full"))
+
 
 ggplot() +
-  geom_tile(data = resist_surf_N_df, aes(x, y, fill = layer)) +
-  scale_fill_viridis_c("Time Spent\nMoving (s)", option = "inferno", na.value = "n") +
-  geom_point(data = dat.N, aes(x, y, color = id)) +
+  geom_tile(data = resistSurfN.df, aes(x, y, fill = layer)) +
+  scale_fill_viridis_c("Time Spent\nper Cell (s)", option = "inferno", na.value = "n") +
+  geom_point(data = dat.N, aes(x, y, color = id), size = 0.5, alpha = 0.2, show.legend = F) +
   scale_x_continuous(expand = c(0,0)) +
   scale_y_continuous(expand = c(0,0)) +
   labs(x="Easting", y="Northing", title = "North Pantanal Resistance Surface") +
   theme_bw() +
-  coord_equal()
+  coord_equal() +
+  theme(legend.position = "bottom",
+        axis.title = element_text(size = 18),
+        axis.text = element_text(size = 10),
+        strip.text = element_text(size = 16, face = "bold"),
+        plot.title = element_text(size = 22),
+        legend.title = element_text(size = 14),
+        legend.text = element_text(size = 12)) +
+  guides(fill = guide_colourbar(barwidth = 30, barheight = 1)) +
+  facet_wrap(~ phase)
 
 
 
@@ -176,24 +162,72 @@ betas_S<- colMeans(store.betas_S.df)
 covars.S2<- covars.S[[c("dist2rd","ndvi")]]
 covars.S2$dist2rd<- scale(covars.S2$dist2rd, center = T, scale = T)
 covars.S2$ndvi<- scale(covars.S2$ndvi, center = T, scale = T)
+dist_ndvi.rast<- scale(covars.S$dist2rd * covars.S$ndvi, center = T, scale = T)
+
+covars.S2<- stack(covars.S2, dist_ndvi.rast) %>% brick()
+
+scaled_lunar_S<- path.S$lunar %>% 
+  scale(center = T, scale = T) %>% 
+  as.data.frame() %>% 
+  summarise(min=min(V1), mean=mean(V1), max=max(V1))
 
 
 #Perform raster math using beta coeffs (include intercept and beta coeff for lunar as constants)
-resist_surf_S<- exp(
+
+#New moon
+resistSurfS_new<- exp(
   betas_S["int"] + 
     betas_S["dist2rd"]*covars.S2$dist2rd + 
     betas_S["ndvi"]*covars.S2$ndvi + 
-    betas_S["lunar"]
+    betas_S["lunar"]*scaled_lunar_S$min +  #for new moon
+    betas_S["dist_ndvi"]*covars.S2$layer
 )
-resist_surf_S_df<- as.data.frame(resist_surf_S, xy=T)
-plot(resist_surf_S)
+resistSurfS_new.df<- as.data.frame(resistSurfS_new, xy=T) %>% 
+  mutate(phase = "New")
+
+#Quarter moon
+resistSurfS_quarter<- exp(
+  betas_S["int"] + 
+    betas_S["dist2rd"]*covars.S2$dist2rd + 
+    betas_S["ndvi"]*covars.S2$ndvi + 
+    betas_S["lunar"]*scaled_lunar_S$mean +  #for quarter moon
+    betas_S["dist_ndvi"]*covars.S2$layer
+)
+resistSurfS_quarter.df<- as.data.frame(resistSurfS_quarter, xy=T) %>% 
+  mutate(phase = "Quarter")
+
+#Full moon
+resistSurfS_full<- exp(
+  betas_S["int"] + 
+    betas_S["dist2rd"]*covars.S2$dist2rd + 
+    betas_S["ndvi"]*covars.S2$ndvi + 
+    betas_S["lunar"]*scaled_lunar_S$max +  #for full moon
+    betas_S["dist_ndvi"]*covars.S2$layer
+)
+resistSurfS_full.df<- as.data.frame(resistSurfS_full, xy=T) %>% 
+  mutate(phase = "Full")
+
+
+#Combine all results together for each level of lunar illumination
+resistSurfS.df<- rbind(resistSurfS_new.df, resistSurfS_quarter.df, resistSurfS_full.df)
+resistSurfS.df$phase<- factor(resistSurfS.df$phase, levels = c("New", "Quarter", "Full"))
+
 
 ggplot() +
-  geom_tile(data = resist_surf_S_df, aes(x, y, fill = layer)) +
-  scale_fill_viridis_c("Time Spent\nMoving (s)", option = "inferno", na.value = "n") +
-  geom_point(data = dat.S, aes(x, y, color = id)) +
+  geom_tile(data = resistSurfS.df, aes(x, y, fill = layer)) +
+  scale_fill_viridis_c("Time Spent\nper Cell (s)", option = "inferno", na.value = "n") +
+  geom_point(data = dat.S, aes(x, y, color = id), size = 0.5, alpha = 0.2, show.legend = F) +
   scale_x_continuous(expand = c(0,0)) +
   scale_y_continuous(expand = c(0,0)) +
   labs(x="Easting", y="Northing", title = "South Pantanal Resistance Surface") +
   theme_bw() +
-  coord_equal()
+  coord_equal() +
+  theme(legend.position = "bottom",
+        axis.title = element_text(size = 18),
+        axis.text = element_text(size = 10),
+        strip.text = element_text(size = 16, face = "bold"),
+        plot.title = element_text(size = 22),
+        legend.title = element_text(size = 14),
+        legend.text = element_text(size = 12)) +
+  guides(fill = guide_colourbar(barwidth = 30, barheight = 1)) +
+  facet_wrap(~ phase)

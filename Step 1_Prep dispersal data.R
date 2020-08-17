@@ -56,6 +56,25 @@ dist2rdN_30m<- resample(EucDist_cerc_Copy.tif, ex.ras, method = "bilinear")
 #                                  fact = 2,
 #                                  fun = mean)
 
+# Create dummy rasters for extent of each region (with buffer) to crop down rasters
+
+#North
+rast.N<- raster(ext=extent(c(min(dat.N$x) - 30, max(dat.N$x) + 30, min(dat.N$y) - 30,
+                             max(dat.N$y + 30))),
+                crs = "+init=epsg:32721",
+                res = 30)
+values(rast.N)<- 0
+dist2rdN_30m<- crop(dist2rdN_30m, rast.N)
+plot(dist2rdN_30m); points(dat.N$x, dat.N$y)
+
+#South
+rast.S<- raster(ext=extent(c(min(dat.S$x) - 30, max(dat.S$x) + 30, min(dat.S$y) - 30,
+                             max(dat.S$y + 30))),
+                crs = "+init=epsg:32721",
+                res = 30)
+values(rast.S)<- 0
+dist2rdS_30m<- crop(dist2rdS_30m, rast.S)
+plot(dist2rdS_30m); points(dat.S$x, dat.S$y)
 
 
 
