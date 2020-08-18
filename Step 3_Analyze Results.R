@@ -1,5 +1,6 @@
 ### Visualize Results from Best Models ###
 
+library(ggridges)
 
 ### North Pantanal
 
@@ -25,6 +26,16 @@ ggplot(store.betas.long_N %>% filter(betas != "int"), aes(x=betas, y=value)) +
   geom_boxplot(color="firebrick") +
   geom_hline(yintercept = 0, size = 0.5) +
   labs(x="Beta Coefficients", y="Value", title = "North Pantanal") +
+  theme_bw() +
+  theme(axis.title = element_text(size = 14),
+        axis.text = element_text(size = 12),
+        legend.title = element_text(size = 12))
+
+ggplot(store.betas.long_N %>% filter(betas != "int"), aes(y=betas, x=value, fill = betas)) +
+  geom_density_ridges() +
+  scale_fill_viridis_d("Coeffs", guide = guide_legend(reverse = TRUE)) +
+  geom_vline(xintercept = 0, size = 0.5) +
+  labs(y="Beta Coefficients", x="Value", title = "North Pantanal") +
   theme_bw() +
   theme(axis.title = element_text(size = 14),
         axis.text = element_text(size = 12),
@@ -59,6 +70,16 @@ ggplot(store.betas.long_S %>% filter(betas != "int"), aes(x=betas, y=value)) +
   geom_boxplot(color="darkturquoise") +
   geom_hline(yintercept = 0, size = 0.5) +
   labs(x="Beta Coefficients", y="Value", title = "South Pantanal") +
+  theme_bw() +
+  theme(axis.title = element_text(size = 14),
+        axis.text = element_text(size = 12),
+        legend.title = element_text(size = 12))
+
+ggplot(store.betas.long_S %>% filter(betas != "int"), aes(y=betas, x=value, fill = betas)) +
+  geom_density_ridges() +
+  scale_fill_viridis_d("Coeffs", option = "viridis", guide = guide_legend(reverse = TRUE)) +
+  geom_vline(xintercept = 0, size = 0.5) +
+  labs(y="Beta Coefficients", x="Value", title = "South Pantanal") +
   theme_bw() +
   theme(axis.title = element_text(size = 14),
         axis.text = element_text(size = 12),
