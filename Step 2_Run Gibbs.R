@@ -31,13 +31,13 @@ path.S<- read.csv('S Armadillo Resistance Data_dispersal.csv', as.is=T)
 
 #analyze sites separately
 path.N.scaled<- path.N %>% 
-  mutate(dist_ndvi = dist2rd*ndvi) %>% 
-  mutate_at(c("dist2rd","ndvi","lunar", "dist_ndvi"), ~scale(., center = TRUE, scale = TRUE))
+  mutate_at(c("dist2rd","ndvi","lunar"), ~scale(., center = TRUE, scale = TRUE)) %>%
+  mutate(dist_ndvi = dist2rd*ndvi)
 
 path.S.scaled<- path.S %>% 
-  mutate(dist_ndvi = dist2rd*ndvi) %>% 
-  mutate_at(c("dist2rd","ndvi","lunar", "dist_ndvi"), ~scale(., center = TRUE, scale = TRUE))
-
+  mutate_at(c("dist2rd","ndvi","lunar"), ~scale(., center = TRUE, scale = TRUE)) %>%
+  mutate(dist_ndvi = dist2rd*ndvi)
+  
 
 
 
@@ -71,10 +71,10 @@ var.betas<- c(100,rep(10,ncol(xmat)-1))
 mod.res_N1<- gibbs_resist(ysoma = ysoma, xmat = xmat[,1:4], seg.id = seg.id,
                      ngibbs = ngibbs, nburn = nburn, var.betas = var.betas[1:4],
                      w = w, MaxIter = MaxtIter)
-# takes 11 s to run (for 1000 iter)
+# takes 10 s to run (for 1000 iter)
 
 
-#W interaction term
+#W/ interaction term
 mod.res_N2<- gibbs_resist(ysoma = ysoma, xmat = xmat, seg.id = seg.id,
                           ngibbs = ngibbs, nburn = nburn, var.betas = var.betas,
                           w = w, MaxIter = MaxtIter)
@@ -115,13 +115,13 @@ var.betas<- c(100,rep(10,ncol(xmat)-1))
 mod.res_S1<- gibbs_resist(ysoma = ysoma, xmat = xmat[,1:4], seg.id = seg.id,
                          ngibbs = ngibbs, nburn = nburn, var.betas = var.betas[1:4],
                          w = w, MaxIter = MaxtIter)
-# takes 9 s to run (for 1000 iter)
+# takes 8 s to run (for 1000 iter)
 
-#W interaction term
+#W/ interaction term
 mod.res_S2<- gibbs_resist(ysoma = ysoma, xmat = xmat, seg.id = seg.id,
                          ngibbs = ngibbs, nburn = nburn, var.betas = var.betas,
                          w = w, MaxIter = MaxtIter)
-# takes 11 s to run (for 1000 iter)
+# takes 9 s to run (for 1000 iter)
 
 
 
@@ -166,7 +166,7 @@ par(mfrow=c(1,1),mar=rep(3,4))
 
 
 
-#W interaction term
+#W/ interaction term
 store.llk_N2<- mod.res_N2$llk
 store.b_N2<- mod.res_N2$b.gamma
 store.betas_N2<- mod.res_N2$betas
@@ -245,7 +245,7 @@ par(mfrow=c(1,1),mar=rep(3,4))
 
 
 
-#W interaction term
+#W/ interaction term
 store.llk_S2<- mod.res_S2$llk
 store.b_S2<- mod.res_S2$b.gamma
 store.betas_S2<- mod.res_S2$betas

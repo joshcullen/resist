@@ -160,9 +160,10 @@ betas_S<- colMeans(store.betas_S.df)
 
 #Need to center and scale raster values so comparable to beta coeffs
 covars.S2<- covars.S[[c("dist2rd","ndvi")]]
+values(covars.S2$ndvi)[values(covars.S2$ndvi) < 0.2]<- NA  #Mask water on landscape
 covars.S2$dist2rd<- scale(covars.S2$dist2rd, center = T, scale = T)
 covars.S2$ndvi<- scale(covars.S2$ndvi, center = T, scale = T)
-dist_ndvi.rast<- scale(covars.S$dist2rd * covars.S$ndvi, center = T, scale = T)
+dist_ndvi.rast<- covars.S2$dist2rd * covars.S2$ndvi
 
 covars.S2<- stack(covars.S2, dist_ndvi.rast) %>% brick()
 
