@@ -75,8 +75,8 @@ print.adapt = function(accept1z,jump1z,accept.output){
 
   for (k in 1:length(accept1)){
     z=accept1[[k]]/accept.output
-    print(names(accept1)[k])
-    print(z); print(jump1[[k]])
+    # print(names(accept1)[k])
+    # print(z); print(jump1[[k]])
   }
 
   for (k in 1:length(jump1)){

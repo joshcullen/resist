@@ -4,38 +4,85 @@ library(ggridges)
 
 ### North Pantanal
 
-#look at betas (convert to data frame)
-store.betas_N.df<- data.frame(store.betas_N1[(nburn+1):ngibbs, ])
-names(store.betas_N.df)<- c("int","dist2rd","ndvi","lunar")
-store.betas.long_N<- tidyr::pivot_longer(store.betas_N.df, cols = names(store.betas_N.df),
-                                         names_to = "betas")
-store.betas.long_N$betas<- factor(store.betas.long_N$betas,
-                                   levels = names(store.betas_N.df))
+## Foraging
 
-ggplot(store.betas.long_N, aes(x=betas, y=value)) +
+#look at betas (convert to data frame)
+store.betas_Nforage<- data.frame(mod.forage_N1$betas[(nburn+1):ngibbs, ])
+names(store.betas_Nforage)<- c("int","dist2rd","slope","ndvi","lunar")
+store.betas.long_Nforage<- tidyr::pivot_longer(store.betas_Nforage,
+                                               cols = names(store.betas_Nforage),
+                                               names_to = "betas")
+store.betas.long_Nforage$betas<- factor(store.betas.long_Nforage$betas,
+                                   levels = names(store.betas_Nforage))
+
+ggplot(store.betas.long_Nforage, aes(x=betas, y=value)) +
   geom_boxplot(color="firebrick") +
   geom_hline(yintercept = 0, size = 0.5) +
-  labs(x="Beta Coefficients", y="Value", title = "North Pantanal") +
+  labs(x="Beta Coefficients", y="Value", title = "North Pantanal (Foraging)") +
   theme_bw() +
   theme(axis.title = element_text(size = 14),
         axis.text = element_text(size = 12),
         legend.title = element_text(size = 12))
 
 # w/o intercept
-ggplot(store.betas.long_N %>% filter(betas != "int"), aes(x=betas, y=value)) +
+ggplot(store.betas.long_Nforage %>% filter(betas != "int"), aes(x=betas, y=value)) +
   geom_boxplot(color="firebrick") +
   geom_hline(yintercept = 0, size = 0.5) +
-  labs(x="Beta Coefficients", y="Value", title = "North Pantanal") +
+  labs(x="Beta Coefficients", y="Value", title = "North Pantanal (Foraging)") +
   theme_bw() +
   theme(axis.title = element_text(size = 14),
         axis.text = element_text(size = 12),
         legend.title = element_text(size = 12))
 
-ggplot(store.betas.long_N %>% filter(betas != "int"), aes(y=betas, x=value, fill = betas)) +
+ggplot(store.betas.long_Nforage %>% filter(betas != "int"),aes(y=betas, x=value, fill = betas)) +
   geom_density_ridges() +
   scale_fill_viridis_d("Coeffs", guide = guide_legend(reverse = TRUE)) +
   geom_vline(xintercept = 0, size = 0.5) +
-  labs(y="Beta Coefficients", x="Value", title = "North Pantanal") +
+  labs(y="Beta Coefficients", x="Value", title = "North Pantanal (Foraging)") +
+  theme_bw() +
+  theme(axis.title = element_text(size = 14),
+        axis.text = element_text(size = 12),
+        legend.title = element_text(size = 12))
+
+
+
+
+## Transit
+
+#look at betas (convert to data frame)
+store.betas_Ntransit<- data.frame(mod.transit_N1$betas[(nburn+1):ngibbs, ])
+names(store.betas_Ntransit)<- c("int","dist2rd","slope","ndvi","lunar")
+store.betas.long_Ntransit<- tidyr::pivot_longer(store.betas_Ntransit,
+                                               cols = names(store.betas_Ntransit),
+                                               names_to = "betas")
+store.betas.long_Ntransit$betas<- factor(store.betas.long_Ntransit$betas,
+                                        levels = names(store.betas_Ntransit))
+
+ggplot(store.betas.long_Ntransit, aes(x=betas, y=value)) +
+  geom_boxplot(color="firebrick") +
+  geom_hline(yintercept = 0, size = 0.5) +
+  labs(x="Beta Coefficients", y="Value", title = "North Pantanal (Transit)") +
+  theme_bw() +
+  theme(axis.title = element_text(size = 14),
+        axis.text = element_text(size = 12),
+        legend.title = element_text(size = 12))
+
+# w/o intercept
+ggplot(store.betas.long_Ntransit %>% filter(betas != "int"), aes(x=betas, y=value)) +
+  geom_boxplot(color="firebrick") +
+  geom_hline(yintercept = 0, size = 0.5) +
+  labs(x="Beta Coefficients", y="Value", title = "North Pantanal (Transit)") +
+  theme_bw() +
+  theme(axis.title = element_text(size = 14),
+        axis.text = element_text(size = 12),
+        legend.title = element_text(size = 12))
+
+ggplot(store.betas.long_Ntransit %>% filter(betas != "int"), aes(y=betas, x=value,
+                                                                 fill = betas)) +
+  geom_density_ridges() +
+  scale_fill_viridis_d("Coeffs", guide = guide_legend(reverse = TRUE)) +
+  geom_vline(xintercept = 0, size = 0.5) +
+  labs(y="Beta Coefficients", x="Value", title = "North Pantanal (Transit)") +
   theme_bw() +
   theme(axis.title = element_text(size = 14),
         axis.text = element_text(size = 12),
@@ -48,42 +95,93 @@ ggplot(store.betas.long_N %>% filter(betas != "int"), aes(y=betas, x=value, fill
 
 ### South Pantanal
 
-#look at betas (convert to data frame)
-store.betas_S.df<- data.frame(store.betas_S2[(nburn+1):ngibbs, ])
-names(store.betas_S.df)<- c("int","dist2rd","ndvi","lunar","dist_ndvi")
-store.betas.long_S<- tidyr::pivot_longer(store.betas_S.df, cols = names(store.betas_S.df),
-                                         names_to = "betas")
-store.betas.long_S$betas<- factor(store.betas.long_S$betas,
-                                  levels = names(store.betas_S.df))
+## Foraging
 
-ggplot(store.betas.long_S, aes(x=betas, y=value)) +
+#look at betas (convert to data frame)
+store.betas_Sforage<- data.frame(mod.forage_S1$betas[(nburn+1):ngibbs, ])
+names(store.betas_Sforage)<- c("int","dist2rd","slope","ndvi","lunar")
+store.betas.long_Sforage<- tidyr::pivot_longer(store.betas_Sforage,
+                                               cols = names(store.betas_Sforage),
+                                               names_to = "betas")
+store.betas.long_Sforage$betas<- factor(store.betas.long_Sforage$betas,
+                                        levels = names(store.betas_Sforage))
+
+ggplot(store.betas.long_Sforage, aes(x=betas, y=value)) +
   geom_boxplot(color="darkturquoise") +
   geom_hline(yintercept = 0, size = 0.5) +
-  labs(x="Beta Coefficients", y="Value", title = "South Pantanal") +
+  labs(x="Beta Coefficients", y="Value", title = "South Pantanal (Foraging)") +
   theme_bw() +
   theme(axis.title = element_text(size = 14),
         axis.text = element_text(size = 12),
         legend.title = element_text(size = 12))
 
 # w/o intercept
-ggplot(store.betas.long_S %>% filter(betas != "int"), aes(x=betas, y=value)) +
+ggplot(store.betas.long_Sforage %>% filter(betas != "int"), aes(x=betas, y=value)) +
   geom_boxplot(color="darkturquoise") +
   geom_hline(yintercept = 0, size = 0.5) +
-  labs(x="Beta Coefficients", y="Value", title = "South Pantanal") +
+  labs(x="Beta Coefficients", y="Value", title = "South Pantanal (Foraging)") +
   theme_bw() +
   theme(axis.title = element_text(size = 14),
         axis.text = element_text(size = 12),
         legend.title = element_text(size = 12))
 
-ggplot(store.betas.long_S %>% filter(betas != "int"), aes(y=betas, x=value, fill = betas)) +
+ggplot(store.betas.long_Sforage %>% filter(betas != "int"),aes(y=betas, x=value, fill = betas)) +
   geom_density_ridges() +
-  scale_fill_viridis_d("Coeffs", option = "viridis", guide = guide_legend(reverse = TRUE)) +
+  scale_fill_viridis_d("Coeffs", guide = guide_legend(reverse = TRUE)) +
   geom_vline(xintercept = 0, size = 0.5) +
-  labs(y="Beta Coefficients", x="Value", title = "South Pantanal") +
+  labs(y="Beta Coefficients", x="Value", title = "South Pantanal (Foraging)") +
   theme_bw() +
   theme(axis.title = element_text(size = 14),
         axis.text = element_text(size = 12),
         legend.title = element_text(size = 12))
+
+
+
+
+## Transit
+
+#look at betas (convert to data frame)
+store.betas_Stransit<- data.frame(mod.transit_S1$betas[(nburn+1):ngibbs, ])
+names(store.betas_Stransit)<- c("int","dist2rd","slope","ndvi","lunar")
+store.betas.long_Stransit<- tidyr::pivot_longer(store.betas_Stransit,
+                                                cols = names(store.betas_Stransit),
+                                                names_to = "betas")
+store.betas.long_Stransit$betas<- factor(store.betas.long_Stransit$betas,
+                                         levels = names(store.betas_Stransit))
+
+ggplot(store.betas.long_Stransit, aes(x=betas, y=value)) +
+  geom_boxplot(color="darkturquoise") +
+  geom_hline(yintercept = 0, size = 0.5) +
+  labs(x="Beta Coefficients", y="Value", title = "South Pantanal (Transit)") +
+  theme_bw() +
+  theme(axis.title = element_text(size = 14),
+        axis.text = element_text(size = 12),
+        legend.title = element_text(size = 12))
+
+# w/o intercept
+ggplot(store.betas.long_Stransit %>% filter(betas != "int"), aes(x=betas, y=value)) +
+  geom_boxplot(color="darkturquoise") +
+  geom_hline(yintercept = 0, size = 0.5) +
+  labs(x="Beta Coefficients", y="Value", title = "South Pantanal (Transit)") +
+  theme_bw() +
+  theme(axis.title = element_text(size = 14),
+        axis.text = element_text(size = 12),
+        legend.title = element_text(size = 12))
+
+ggplot(store.betas.long_Stransit %>% filter(betas != "int"), aes(y=betas, x=value,
+                                                                 fill = betas)) +
+  geom_density_ridges() +
+  scale_fill_viridis_d("Coeffs", guide = guide_legend(reverse = TRUE)) +
+  geom_vline(xintercept = 0, size = 0.5) +
+  labs(y="Beta Coefficients", x="Value", title = "South Pantanal (Transit)") +
+  theme_bw() +
+  theme(axis.title = element_text(size = 14),
+        axis.text = element_text(size = 12),
+        legend.title = element_text(size = 12))
+
+
+
+
 
 
 

@@ -32,12 +32,17 @@ df.to.list = function(dat, ind) {  #ind must be in quotes
 # }
 
 #----------------------------
-extract.covars = function(dat, layers) {
+extract.covars = function(dat, layers, state.col) {
+  ## dat = data frame containing at least the id, coordinates (x,y), and date-time
+  ## layers = a RasterStack or RasterBrick object containing environ covars
+  ## state.col = character. The name of the column that contains behavioral states w/in
+  ##             dat (if present)
+  
   
   path<- list()
   ind<- unique(dat$id)
   
-  for (i in 1:n_distinct(dat$id)) {
+  for (i in 1:dplyr::n_distinct(dat$id)) {
     
     #Subset and prep data
     tmp<- dat %>% 
@@ -46,7 +51,7 @@ extract.covars = function(dat, layers) {
       dplyr::mutate_at("dt", {. %>% 
           as.numeric() %>%
           round()})
-    tmp$dt<- c(purrr::discard(tmp$dt, is.na), NA)
+      tmp$dt<- c(purrr::discard(tmp$dt, is.na), NA)
     
     extr.covar<- data.frame()
     
@@ -61,7 +66,9 @@ extract.covars = function(dat, layers) {
       tmp1<- raster::extract(layers, segment, along = TRUE, cellnumbers = FALSE) %>% 
         purrr::map(., ~matrix(., ncol = nlayers(layers))) %>% 
         map_dfr(., as_data_frame, .id = "seg.id") %>% 
-        mutate(seg.id = j-1, dt = NA, id = ind[i], date = tmp$date[j-1])
+        mutate(seg.id = j-1, dt = NA, id = ind[i], date = tmp$date[j-1],
+               state = tmp[j-1,state.col])
+      
       tmp1[nrow(tmp1),"dt"]<- as.numeric(tmp$dt[j-1])
       names(tmp1)[2:(1 + nlayers(layers))]<- names(layers)
       
