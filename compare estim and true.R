@@ -6,6 +6,7 @@ store.theta=mod.res$theta
 #look at correlation
 k=cor(cbind(store.b,store.betas))
 k[k < 0.5 & k > -0.5]=NA
+diag(k)=NA
 k
 
 #look at overall convergence

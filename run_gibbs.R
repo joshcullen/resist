@@ -7,6 +7,7 @@ setwd('U:\\GIT_models\\resist')
 source('gibbs_resist.R')
 source('gibbs_resist_func.R')
 source('slice_b_gamma.R')
+source('slice_betas.R')
 sourceCpp('resist_aux.cpp')
 dat=read.csv('fake data.csv',as.is=T)
 ind=grep('cov',colnames(dat))
@@ -27,4 +28,4 @@ var.betas=c(100,rep(10,ncol(xmat)-1))
 
 mod.res=gibbs_resist(ysoma=ysoma,xmat=xmat,seg.id=seg.id,
                      ngibbs=ngibbs,nburn=nburn,var.betas=var.betas,
-                     w=w,MaxIter=MaxtIter)
+                     w=w,MaxIter=MaxIter)

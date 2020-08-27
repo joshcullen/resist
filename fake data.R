@@ -1,9 +1,9 @@
 rm(list=ls())
-set.seed(18)
+set.seed(25)
 
 setwd('U:\\GIT_models\\resist')
 n=50000
-nparam=3
+nparam=5
 xmat=matrix(runif(n*nparam,min=-2,max=2),n,nparam)
 nomes.cov=paste0('covs',1:nparam)
 colnames(xmat)=nomes.cov
@@ -12,7 +12,7 @@ n=nrow(xmat)
 betas.true=betas=runif(nparam+1)
 media=exp(cbind(1,xmat)%*%betas); range(round(media,3))
 
-b.true=b=4
+b.true=b=2
 a=b*media
 ymat=rgamma(n,a,b) 
 
