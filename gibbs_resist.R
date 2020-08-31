@@ -5,10 +5,12 @@ gibbs_resist=function(ysoma,xmat,seg.id,ngibbs,nburn,var.betas,w,MaxIter){
   
   #initial parameters
   betas=matrix(0,nparam,1)
+  tmp=ysoma/table(seg.id)
+  betas[1]=mean(log(tmp))
   b.gamma=1
 
-  #for joint sampling of betas
-  var1=diag(1,nparam)
+  #priors
+  sd.betas=sqrt(var.betas)
 
   #stuff for gibbs sampler
   store.betas=matrix(NA,ngibbs,nparam)
@@ -17,17 +19,19 @@ gibbs_resist=function(ysoma,xmat,seg.id,ngibbs,nburn,var.betas,w,MaxIter){
 
   for (i in 1:ngibbs){
     print(i)
+    # print(sum(abs(betas)))
     
     #sample betas
     betas=Sample_betas(nparam=nparam,xmat=xmat,ysoma=ysoma,betas=betas,
-                       b.gamma=b.gamma,var.betas=var1,w=w,MaxIter=MaxIter,seg.id=seg.id,nagg=nagg)
+                       b.gamma=b.gamma,sd.betas=sd.betas,w=w,MaxIter=MaxIter,
+                       seg.id=seg.id,nagg=nagg)
     # betas=betas.true
     
     #sample b.gamma
     b.gamma=Sample_bgamma(nparam=nparam,xmat=xmat,
                           ysoma=ysoma,betas=betas,b.gamma=b.gamma,
                           w=w,MaxIter=MaxIter,seg.id=seg.id,nagg=nagg)
-    # b.gamma=b.true
+    # b.gamma=1
     
     #get llk
     p=get.llk(betas=betas,xmat=xmat,ysoma=ysoma,b.gamma=b.gamma,
