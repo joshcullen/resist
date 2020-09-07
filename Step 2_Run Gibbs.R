@@ -2,11 +2,13 @@ library(Rcpp)
 library(mvtnorm)
 library(dplyr)
 library(ggplot2)
+library(tidyr)
 library(tictoc)
 
 source('gibbs_resist.R')
 source('gibbs_resist_func.R')
 source('slice_b_gamma.R')
+source('slice_betas.R')
 sourceCpp('resist_aux.cpp')
 
 
@@ -14,8 +16,19 @@ sourceCpp('resist_aux.cpp')
 path.N<- read.csv('N Armadillo Resistance Data.csv', as.is=T)
 path.S<- read.csv('S Armadillo Resistance Data.csv', as.is=T)
 
+path.N$dt<- path.N$dt/60  #convert to min from sec
+path.S$dt<- path.S$dt/60
 
-## Filter data by behavior (foraging or transit)
+
+# Filter data for only steps with 3 >= dt >= 7 min
+cond.N<- path.N[path.N$dt >= 3 & path.N$dt <= 7 & !is.na(path.N$dt), "seg.id"]
+path.N<- path.N[path.N$seg.id %in% cond.N,]
+
+cond.S<- path.S[path.S$dt >= 3 & path.S$dt <= 7 & !is.na(path.S$dt), "seg.id"]
+path.S<- path.S[path.S$seg.id %in% cond.S,]
+
+
+# Filter data by behavior (foraging or transit)
 path.N.forage<- path.N %>% 
   filter(state == "Foraging")
 path.N.transit<- path.N %>% 
@@ -29,18 +42,22 @@ path.S.transit<- path.S %>%
 
 #Center and Scale covariates 
 path.N.forage<- path.N.forage %>% 
-  mutate_at(c("dist2rd","slope","ndvi","lunar"), ~scale(., center = TRUE, scale = TRUE)) %>%
-  mutate(dist_ndvi = dist2rd*ndvi)
+  mutate_at(c("dist2rd","slope","ndvi","lunar","t.ar","rain"),
+            ~scale(., center = TRUE, scale = TRUE)) %>% 
+  drop_na(t.ar)
 path.N.transit<- path.N.transit %>% 
-  mutate_at(c("dist2rd","slope","ndvi","lunar"), ~scale(., center = TRUE, scale = TRUE)) %>%
-  mutate(dist_ndvi = dist2rd*ndvi)
+  mutate_at(c("dist2rd","slope","ndvi","lunar","t.ar","rain"),
+            ~scale(., center = TRUE, scale = TRUE)) %>% 
+  drop_na(t.ar)
 
 path.S.forage<- path.S.forage %>% 
-  mutate_at(c("dist2rd","slope","ndvi","lunar"), ~scale(., center = TRUE, scale = TRUE)) %>%
-  mutate(dist_ndvi = dist2rd*ndvi)
+  mutate_at(c("dist2rd","slope","ndvi","lunar","t.ar","rain"),
+            ~scale(., center = TRUE, scale = TRUE)) %>% 
+  drop_na(t.ar)
 path.S.transit<- path.S.transit %>% 
-  mutate_at(c("dist2rd","slope","ndvi","lunar"), ~scale(., center = TRUE, scale = TRUE)) %>%
-  mutate(dist_ndvi = dist2rd*ndvi)
+  mutate_at(c("dist2rd","slope","ndvi","lunar","t.ar","rain"),
+            ~scale(., center = TRUE, scale = TRUE)) %>% 
+  drop_na(t.ar)
 
 
 
@@ -52,8 +69,7 @@ path.S.transit<- path.S.transit %>%
 
 ## Foraging
 
-ind<- grep(paste(c("dist2rd","slope","ndvi","lunar","dist_ndvi"), collapse="|"),
-           names(path.N.forage))
+ind<- c("dist2rd","slope","ndvi","t.ar","rain")
 xmat<- data.matrix(cbind(1, path.N.forage[,ind]))
 
 #reformat seg.id so it is consecutive and numeric
@@ -67,36 +83,25 @@ k<- unique(seg.id)
 unique(k-c(1:max(k))) #should be 0 
 
 #get y soma
-tmp<- unique(path.N.forage[,c('seg.id','dt')])
-ysoma<- tmp %>% 
-  tidyr::drop_na() %>% 
-  dplyr::pull(dt)
+cond=!is.na(path.N.forage$dt)
+ysoma=path.N.forage[cond,'dt']
   
 #model args
-ngibbs<- 2000
-nburn<- ngibbs/2
-w<- 0.1
-MaxIter<- 100
+ngibbs=1000
+nburn=ngibbs/2
+w=0.1
+MaxIter=10000
 
 #priors
-var.betas<- c(100,rep(10,ncol(xmat)-1))
+var.betas=rep(10,ncol(xmat)) #changed
 
 
-#W/o interaction term
+#Run model
 set.seed(2)
-mod.forage_N1<- gibbs_resist(ysoma = ysoma, xmat = xmat[,1:5], seg.id = seg.id,
-                     ngibbs = ngibbs, nburn = nburn, var.betas = var.betas[1:5],
-                     w = w, MaxIter = MaxtIter)
-# takes 2 min to run (for 2000 iter)
-
-
-#W/ interaction term
-set.seed(2)
-mod.forage_N2<- gibbs_resist(ysoma = ysoma, xmat = xmat, seg.id = seg.id,
-                          ngibbs = ngibbs, nburn = nburn, var.betas = var.betas,
-                          w = w, MaxIter = MaxtIter)
-# takes 2 min to run (for 2000 iter)
-
+mod.forage_N<- gibbs_resist(ysoma = ysoma, xmat = xmat, seg.id = seg.id,
+                     ngibbs = ngibbs, nburn = nburn, var.betas = var.betas,
+                     w = w, MaxIter = MaxIter)
+# takes 2.5 min to run (for 1000 iter)
 
 
 
@@ -104,8 +109,7 @@ mod.forage_N2<- gibbs_resist(ysoma = ysoma, xmat = xmat, seg.id = seg.id,
 
 ## Transit
 
-ind<- grep(paste(c("dist2rd","slope","ndvi","lunar","dist_ndvi"), collapse="|"),
-           names(path.N.transit))
+ind<- c("dist2rd","slope","ndvi","t.ar","rain")
 xmat<- data.matrix(cbind(1, path.N.transit[,ind]))
 
 #reformat seg.id so it is consecutive and numeric
@@ -119,35 +123,25 @@ k<- unique(seg.id)
 unique(k-c(1:max(k))) #should be 0 
 
 #get y soma
-tmp<- unique(path.N.transit[,c('seg.id','dt')])
-ysoma<- tmp %>% 
-  tidyr::drop_na() %>% 
-  dplyr::pull(dt)
+cond=!is.na(path.N.transit$dt)
+ysoma=path.N.transit[cond,'dt']
 
 #model args
-ngibbs<- 2000
-nburn<- ngibbs/2
-w<- 0.1
-MaxIter<- 100
+ngibbs=1000
+nburn=ngibbs/2
+w=0.1
+MaxIter=10000
 
 #priors
-var.betas<- c(100,rep(10,ncol(xmat)-1))
+var.betas=rep(10,ncol(xmat)) #changed
 
 
-#W/o interaction term
+#Run model
 set.seed(2)
-mod.transit_N1<- gibbs_resist(ysoma = ysoma, xmat = xmat[,1:5], seg.id = seg.id,
-                             ngibbs = ngibbs, nburn = nburn, var.betas = var.betas[1:5],
-                             w = w, MaxIter = MaxtIter)
-# takes 1 min to run (for 2000 iter)
-
-
-#W/ interaction term
-set.seed(4)
-mod.transit_N2<- gibbs_resist(ysoma = ysoma, xmat = xmat, seg.id = seg.id,
+mod.transit_N<- gibbs_resist(ysoma = ysoma, xmat = xmat, seg.id = seg.id,
                              ngibbs = ngibbs, nburn = nburn, var.betas = var.betas,
-                             w = w, MaxIter = MaxtIter)
-# takes 38 s to run (for 2000 iter)
+                             w = w, MaxIter = MaxIter)
+# takes 48 s to run (for 1000 iter)
 
 
 
@@ -161,7 +155,7 @@ mod.transit_N2<- gibbs_resist(ysoma = ysoma, xmat = xmat, seg.id = seg.id,
 ### South Pantanal ###
 ######################
 
-ind<- grep(paste(c("dist2rd","slope","ndvi","lunar","dist_ndvi"), collapse="|"),
+ind<- grep(paste(c("dist2rd","slope","ndvi","t.ar","rain"), collapse="|"),
            names(path.S.forage))
 xmat<- data.matrix(cbind(1, path.S.forage[,ind]))
 
@@ -176,35 +170,25 @@ k<- unique(seg.id)
 unique(k-c(1:max(k))) #should be 0 
 
 #get y soma
-tmp<- unique(path.S.forage[,c('seg.id','dt')])
-ysoma<- tmp %>% 
-  tidyr::drop_na() %>% 
-  dplyr::pull(dt)
+cond=!is.na(path.S.forage$dt)
+ysoma=path.S.forage[cond,'dt']
 
 #model args
-ngibbs<- 2000
-nburn<- ngibbs/2
-w<- 0.1
-MaxIter<- 100
+ngibbs=1000
+nburn=ngibbs/2
+w=0.1
+MaxIter=10000
 
 #priors
-var.betas<- c(100,rep(10,ncol(xmat)-1))
+var.betas=rep(10,ncol(xmat)) #changed
 
 
-#W/o interaction term
+#Run model
 set.seed(2)
-mod.forage_S1<- gibbs_resist(ysoma = ysoma, xmat = xmat[,1:5], seg.id = seg.id,
-                             ngibbs = ngibbs, nburn = nburn, var.betas = var.betas[1:5],
-                             w = w, MaxIter = MaxtIter)
-# takes 1 min to run (for 2000 iter)
-
-
-#W/ interaction term
-set.seed(3)
-mod.forage_S2<- gibbs_resist(ysoma = ysoma, xmat = xmat, seg.id = seg.id,
+mod.forage_S<- gibbs_resist(ysoma = ysoma, xmat = xmat, seg.id = seg.id,
                              ngibbs = ngibbs, nburn = nburn, var.betas = var.betas,
-                             w = w, MaxIter = MaxtIter)
-# takes 1 min to run (for 2000 iter)
+                             w = w, MaxIter = MaxIter)
+# takes 1 min to run (for 1000 iter)
 
 
 
@@ -213,7 +197,7 @@ mod.forage_S2<- gibbs_resist(ysoma = ysoma, xmat = xmat, seg.id = seg.id,
 
 ## Transit
 
-ind<- grep(paste(c("dist2rd","slope","ndvi","lunar","dist_ndvi"), collapse="|"),
+ind<- grep(paste(c("dist2rd","slope","ndvi","t.ar","rain"), collapse="|"),
            names(path.S.transit))
 xmat<- data.matrix(cbind(1, path.S.transit[,ind]))
 
@@ -228,35 +212,25 @@ k<- unique(seg.id)
 unique(k-c(1:max(k))) #should be 0 
 
 #get y soma
-tmp<- unique(path.S.transit[,c('seg.id','dt')])
-ysoma<- tmp %>% 
-  tidyr::drop_na() %>% 
-  dplyr::pull(dt)
+cond=!is.na(path.S.transit$dt)
+ysoma=path.S.transit[cond,'dt']
 
 #model args
-ngibbs<- 2000
-nburn<- ngibbs/2
-w<- 0.1
-MaxIter<- 100
+ngibbs=1000
+nburn=ngibbs/2
+w=0.1
+MaxIter=10000
 
 #priors
-var.betas<- c(100,rep(10,ncol(xmat)-1))
+var.betas=rep(10,ncol(xmat)) #changed
 
 
-#W/o interaction term
+#Run model
 set.seed(2)
-mod.transit_S1<- gibbs_resist(ysoma = ysoma, xmat = xmat[,1:5], seg.id = seg.id,
-                              ngibbs = ngibbs, nburn = nburn, var.betas = var.betas[1:5],
-                              w = w, MaxIter = MaxtIter)
-# takes 25 s to run (for 2000 iter)
-
-
-#W/ interaction term
-set.seed(1)
-mod.transit_S2<- gibbs_resist(ysoma = ysoma, xmat = xmat, seg.id = seg.id,
+mod.transit_S<- gibbs_resist(ysoma = ysoma, xmat = xmat, seg.id = seg.id,
                               ngibbs = ngibbs, nburn = nburn, var.betas = var.betas,
-                              w = w, MaxIter = MaxtIter)
-# takes 28 s to run (for 2000 iter)
+                              w = w, MaxIter = MaxIter)
+# takes 25 s to run (for 1000 iter)
 
 
 
@@ -272,29 +246,29 @@ mod.transit_S2<- gibbs_resist(ysoma = ysoma, xmat = xmat, seg.id = seg.id,
 ## Foraging
 
 #W/o interaction term
-store.llk_N1<- mod.forage_N1$llk
-store.b_N1<- mod.forage_N1$b.gamma
-store.betas_N1<- mod.forage_N1$betas
+store.llk.forage_N<- mod.forage_N$llk
+store.b.forage_N<- mod.forage_N$b.gamma
+store.betas.forage_N<- mod.forage_N$betas
 
 #look at overall convergence
-plot(store.llk_N1, type='l')
+plot(store.llk.forage_N, type='l')
 abline(v=nburn, col='red')
-plot(store.llk_N1[(nburn + 1):ngibbs], type='l')
-acf(store.llk_N1[(nburn + 1):ngibbs])
+plot(store.llk.forage_N[(nburn + 1):ngibbs], type='l')
+acf(store.llk.forage_N[(nburn + 1):ngibbs])
 
-plot(store.b_N1, type='l')
-plot(store.b_N1[(nburn + 1):ngibbs], type='l')
-acf(store.b_N1[(nburn + 1):ngibbs])
+plot(store.b.forage_N, type='l')
+plot(store.b.forage_N[(nburn + 1):ngibbs], type='l')
+acf(store.b.forage_N[(nburn + 1):ngibbs])
 
 #look at convergence betas
 par(mfrow=c(2,2))
-nbetas_N1<- ncol(mod.forage_N1$betas)
-for (i in 1:nbetas_N1){
-  plot(mod.forage_N1$betas[,i], type='l')  
+nbetas.forage_N<- ncol(mod.forage_N$betas)
+for (i in 1:nbetas.forage_N){
+  plot(mod.forage_N$betas[,i], type='l')  
 }
 
-for (i in 1:nbetas_N1){
-  plot(mod.forage_N1$betas[(nburn + 1):ngibbs, i], type='l')  
+for (i in 1:nbetas_N){
+  plot(mod.forage_N$betas[(nburn + 1):ngibbs, i], type='l')  
 }
 par(mfrow=c(1,1),mar=rep(3,4))
 
@@ -303,44 +277,16 @@ par(mfrow=c(1,1),mar=rep(3,4))
 
 
 
-#W/ interaction term
-store.llk_N2<- mod.forage_N2$llk
-store.b_N2<- mod.forage_N2$b.gamma
-store.betas_N2<- mod.forage_N2$betas
-
-#look at overall convergence
-plot(store.llk_N2, type='l')
-abline(v=nburn, col='red')
-plot(store.llk_N2[(nburn + 1):ngibbs], type='l')
-acf(store.llk_N2[(nburn + 1):ngibbs])
-
-plot(store.b_N2, type='l')
-plot(store.b_N2[(nburn + 1):ngibbs], type='l')
-acf(store.b_N2[(nburn + 1):ngibbs])
-
-#look at convergence betas
-par(mfrow=c(2,2))
-nbetas_N2<- ncol(mod.forage_N2$betas)
-for (i in 1:nbetas_N2){
-  plot(mod.forage_N2$betas[,i], type='l')  
-}
-
-for (i in 1:nbetas_N2){
-  plot(mod.forage_N2$betas[(nburn + 1):ngibbs, i], type='l')  
-}
-par(mfrow=c(1,1),mar=rep(3,4))
-
-## Traceplots all indicate that convergence has been reached
 
 
-AIC_mcmc = function(llk, npar) {
-  (-2 * llk) + (2*npar) 
-}
-
-AIC_N_NoInt<- AIC_mcmc(llk = mean(store.llk_N1[(nburn+1):ngibbs,]), npar = 6)
-AIC_N_Int<- AIC_mcmc(llk = mean(store.llk_N2[(nburn+1):ngibbs,]), npar = 7)
-
-AIC_N_NoInt - AIC_N_Int  #model 2 (w/ interaction) is much better
+# AIC_mcmc = function(llk, npar) {
+#   (-2 * llk) + (2*npar) 
+# }
+# 
+# AIC_N_NoInt<- AIC_mcmc(llk = mean(store.llk_N[(nburn+1):ngibbs,]), npar = 6)
+# AIC_N_Int<- AIC_mcmc(llk = mean(store.llk_N2[(nburn+1):ngibbs,]), npar = 7)
+# 
+# AIC_N_NoInt - AIC_N_Int  #model 2 (w/ interaction) is much better
 
 
 
@@ -350,29 +296,29 @@ AIC_N_NoInt - AIC_N_Int  #model 2 (w/ interaction) is much better
 ## Transit
 
 #W/o interaction term
-store.llk_N1<- mod.transit_N1$llk
-store.b_N1<- mod.transit_N1$b.gamma
-store.betas_N1<- mod.transit_N1$betas
+store.llk.transit_N<- mod.transit_N$llk
+store.b.transit_N<- mod.transit_N$b.gamma
+store.betas.transit_N<- mod.transit_N$betas
 
 #look at overall convergence
-plot(store.llk_N1, type='l')
+plot(store.llk.transit_N, type='l')
 abline(v=nburn, col='red')
-plot(store.llk_N1[(nburn + 1):ngibbs], type='l')
-acf(store.llk_N1[(nburn + 1):ngibbs])
+plot(store.llk.transit_N[(nburn + 1):ngibbs], type='l')
+acf(store.llk.transit_N[(nburn + 1):ngibbs])
 
-plot(store.b_N1, type='l')
-plot(store.b_N1[(nburn + 1):ngibbs], type='l')
-acf(store.b_N1[(nburn + 1):ngibbs])
+plot(store.b.transit_N, type='l')
+plot(store.b.transit_N[(nburn + 1):ngibbs], type='l')
+acf(store.b.transit_N[(nburn + 1):ngibbs])
 
 #look at convergence betas
 par(mfrow=c(2,2))
-nbetas_N1<- ncol(mod.transit_N1$betas)
-for (i in 1:nbetas_N1){
-  plot(mod.transit_N1$betas[,i], type='l')  
+nbetas.transit_N<- ncol(mod.transit_N$betas)
+for (i in 1:nbetas.transit_N){
+  plot(mod.transit_N$betas[,i], type='l')  
 }
 
-for (i in 1:nbetas_N1){
-  plot(mod.transit_N1$betas[(nburn + 1):ngibbs, i], type='l')  
+for (i in 1:nbetas_N){
+  plot(mod.transit_N$betas[(nburn + 1):ngibbs, i], type='l')  
 }
 par(mfrow=c(1,1),mar=rep(3,4))
 
@@ -380,42 +326,6 @@ par(mfrow=c(1,1),mar=rep(3,4))
 
 
 
-
-#W/ interaction term
-store.llk_N2<- mod.transit_N2$llk
-store.b_N2<- mod.transit_N2$b.gamma
-store.betas_N2<- mod.transit_N2$betas
-
-#look at overall convergence
-plot(store.llk_N2, type='l')
-abline(v=nburn, col='red')
-plot(store.llk_N2[(nburn + 1):ngibbs], type='l')
-acf(store.llk_N2[(nburn + 1):ngibbs])
-
-plot(store.b_N2, type='l')
-plot(store.b_N2[(nburn + 1):ngibbs], type='l')
-acf(store.b_N2[(nburn + 1):ngibbs])
-
-#look at convergence betas
-par(mfrow=c(2,2))
-nbetas_N2<- ncol(mod.transit_N2$betas)
-for (i in 1:nbetas_N2){
-  plot(mod.transit_N2$betas[,i], type='l')  
-}
-
-for (i in 1:nbetas_N2){
-  plot(mod.transit_N2$betas[(nburn + 1):ngibbs, i], type='l')  
-}
-par(mfrow=c(1,1),mar=rep(3,4))
-
-## Traceplots all indicate that convergence has been reached
-
-
-
-AIC_N_NoInt<- AIC_mcmc(llk = mean(store.llk_N1[(nburn+1):ngibbs,]), npar = 6)
-AIC_N_Int<- AIC_mcmc(llk = mean(store.llk_N2[(nburn+1):ngibbs,]), npar = 7)
-
-AIC_N_NoInt - AIC_N_Int  #model 1 (w/o interaction) is much better
 
 
 
@@ -430,72 +340,34 @@ AIC_N_NoInt - AIC_N_Int  #model 1 (w/o interaction) is much better
 ## Foraging
 
 #W/o interaction term
-store.llk_S1<- mod.forage_S1$llk
-store.b_S1<- mod.forage_S1$b.gamma
-store.betas_S1<- mod.forage_S1$betas
+store.llk.forage_S<- mod.forage_S$llk
+store.b.forage_S<- mod.forage_S$b.gamma
+store.betas.forage_S<- mod.forage_S$betas
 
 #look at overall convergence
-plot(store.llk_S1, type='l')
+plot(store.llk.forage_S, type='l')
 abline(v=nburn, col='red')
-plot(store.llk_S1[(nburn + 1):ngibbs], type='l')
-acf(store.llk_S1[(nburn + 1):ngibbs])
+plot(store.llk.forage_S[(nburn + 1):ngibbs], type='l')
+acf(store.llk.forage_S[(nburn + 1):ngibbs])
 
-plot(store.b_S1, type='l')
-plot(store.b_S1[(nburn + 1):ngibbs], type='l')
-acf(store.b_S1[(nburn + 1):ngibbs])
+plot(store.b.forage_S, type='l')
+plot(store.b.forage_S[(nburn + 1):ngibbs], type='l')
+acf(store.b.forage_S[(nburn + 1):ngibbs])
 
 #look at convergence betas
 par(mfrow=c(2,2))
-nbetas_S1<- ncol(mod.forage_S1$betas)
-for (i in 1:nbetas_S1){
-  plot(mod.forage_S1$betas[,i], type='l')  
+nbetas.forage_S<- ncol(mod.forage_S$betas)
+for (i in 1:nbetas.forage_S){
+  plot(mod.forage_S$betas[,i], type='l')  
 }
 
-for (i in 1:nbetas_S1){
-  plot(mod.forage_S1$betas[(nburn + 1):ngibbs, i], type='l')  
+for (i in 1:nbetas.forage_S){
+  plot(mod.forage_S$betas[(nburn + 1):ngibbs, i], type='l')  
 }
 par(mfrow=c(1,1),mar=rep(3,4))
 
 ## Traceplots all indicate that convergence has been reached
 
-
-
-
-#W/ interaction term
-store.llk_S2<- mod.forage_S2$llk
-store.b_S2<- mod.forage_S2$b.gamma
-store.betas_S2<- mod.forage_S2$betas
-
-#look at overall convergence
-plot(store.llk_S2, type='l')
-abline(v=nburn, col='red')
-plot(store.llk_S2[(nburn + 1):ngibbs], type='l')
-acf(store.llk_S2[(nburn + 1):ngibbs])
-
-plot(store.b_S2, type='l')
-plot(store.b_S2[(nburn + 1):ngibbs], type='l')
-acf(store.b_S2[(nburn + 1):ngibbs])
-
-#look at convergence betas
-par(mfrow=c(2,2))
-nbetas_S2<- ncol(mod.forage_S2$betas)
-for (i in 1:nbetas_S2){
-  plot(mod.forage_S2$betas[,i], type='l')  
-}
-
-for (i in 1:nbetas_S2){
-  plot(mod.forage_S2$betas[(nburn + 1):ngibbs, i], type='l')  
-}
-par(mfrow=c(1,1),mar=rep(3,4))
-
-## Traceplots all indicate that convergence has been reached
-
-
-
-AIC_S_NoInt<- AIC_mcmc(llk = mean(store.llk_S1[(nburn+1):ngibbs,]), npar = 6)
-AIC_S_Int<- AIC_mcmc(llk = mean(store.llk_S2[(nburn+1):ngibbs,]), npar = 7)
-
-AIC_S_NoInt - AIC_S_Int  #model 2 (w/ interaction) is much better
 
 
 
@@ -505,29 +377,29 @@ AIC_S_NoInt - AIC_S_Int  #model 2 (w/ interaction) is much better
 ## Transit
 
 #W/o interaction term
-store.llk_S1<- mod.transit_S1$llk
-store.b_S1<- mod.transit_S1$b.gamma
-store.betas_S1<- mod.transit_S1$betas
+store.llk.transit_S<- mod.transit_S$llk
+store.b.transit_S<- mod.transit_S$b.gamma
+store.betas.transit_S<- mod.transit_S$betas
 
 #look at overall convergence
-plot(store.llk_S1, type='l')
+plot(store.llk.transit_S, type='l')
 abline(v=nburn, col='red')
-plot(store.llk_S1[(nburn + 1):ngibbs], type='l')
-acf(store.llk_S1[(nburn + 1):ngibbs])
+plot(store.llk.transit_S[(nburn + 1):ngibbs], type='l')
+acf(store.llk.transit_S[(nburn + 1):ngibbs])
 
-plot(store.b_S1, type='l')
-plot(store.b_S1[(nburn + 1):ngibbs], type='l')
-acf(store.b_S1[(nburn + 1):ngibbs])
+plot(store.b.transit_S, type='l')
+plot(store.b.transit_S[(nburn + 1):ngibbs], type='l')
+acf(store.b.transit_S[(nburn + 1):ngibbs])
 
 #look at convergence betas
 par(mfrow=c(2,2))
-nbetas_S1<- ncol(mod.transit_S1$betas)
-for (i in 1:nbetas_S1){
-  plot(mod.transit_S1$betas[,i], type='l')  
+nbetas.transit_S<- ncol(mod.transit_S$betas)
+for (i in 1:nbetas.transit_S){
+  plot(mod.transit_S$betas[,i], type='l')  
 }
 
-for (i in 1:nbetas_S1){
-  plot(mod.transit_S1$betas[(nburn + 1):ngibbs, i], type='l')  
+for (i in 1:nbetas.transit_S){
+  plot(mod.transit_S$betas[(nburn + 1):ngibbs, i], type='l')  
 }
 par(mfrow=c(1,1),mar=rep(3,4))
 
@@ -535,42 +407,6 @@ par(mfrow=c(1,1),mar=rep(3,4))
 
 
 
-
-#W/ interaction term
-store.llk_S2<- mod.transit_S2$llk
-store.b_S2<- mod.transit_S2$b.gamma
-store.betas_S2<- mod.transit_S2$betas
-
-#look at overall convergence
-plot(store.llk_S2, type='l')
-abline(v=nburn, col='red')
-plot(store.llk_S2[(nburn + 1):ngibbs], type='l')
-acf(store.llk_S2[(nburn + 1):ngibbs])
-
-plot(store.b_S2, type='l')
-plot(store.b_S2[(nburn + 1):ngibbs], type='l')
-acf(store.b_S2[(nburn + 1):ngibbs])
-
-#look at convergence betas
-par(mfrow=c(2,2))
-nbetas_S2<- ncol(mod.transit_S2$betas)
-for (i in 1:nbetas_S2){
-  plot(mod.transit_S2$betas[,i], type='l')  
-}
-
-for (i in 1:nbetas_S2){
-  plot(mod.transit_S2$betas[(nburn + 1):ngibbs, i], type='l')  
-}
-par(mfrow=c(1,1),mar=rep(3,4))
-
-## Traceplots all indicate that convergence has been reached
-
-
-
-AIC_S_NoInt<- AIC_mcmc(llk = mean(store.llk_S1[(nburn+1):ngibbs,]), npar = 6)
-AIC_S_Int<- AIC_mcmc(llk = mean(store.llk_S2[(nburn+1):ngibbs,]), npar = 7)
-
-AIC_S_NoInt - AIC_S_Int  #model 2 (w/ interaction) is much better
 
 
 
@@ -580,4 +416,4 @@ AIC_S_NoInt - AIC_S_Int  #model 2 (w/ interaction) is much better
 
 # Export results
 
-write.csv(, "N Armadillo Resistance Results_dispersal.csv", row.names = F)
+# write.csv(, "N Armadillo Resistance Results_dispersal.csv", row.names = F)

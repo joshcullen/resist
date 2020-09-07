@@ -51,7 +51,7 @@ extract.covars = function(dat, layers, state.col) {
       dplyr::mutate_at("dt", {. %>% 
           as.numeric() %>%
           round()})
-      tmp$dt<- c(purrr::discard(tmp$dt, is.na), NA)
+      # tmp$dt<- c(purrr::discard(tmp$dt, is.na), NA)
     
     extr.covar<- data.frame()
     

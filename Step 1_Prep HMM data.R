@@ -14,7 +14,7 @@ source('helper functions.R')
 ### Import data ###
 ###################
 
-#foraging locs from standard HMM (via momentuHMM)
+#active locs from standard HMM (via momentuHMM)
 dat<- read.csv("Armadillo HMM Results.csv", header = T, sep = ",")
 
 dat<- dat %>% 
@@ -147,11 +147,11 @@ names(covars.S)<- c("dist2rd", "slope", "ndvi")
 #######################################################
 tic()
 path.N<- extract.covars(dat.N, covars.N, "state")
-toc()  #takes 17 min to run
+toc()  #takes 18 min to run
 
 tic()
 path.S<- extract.covars(dat.S, covars.S, "state")
-toc()  #take 6.5 min to run
+toc()  #take 5.5 min to run
 
 
 ##############################
@@ -162,12 +162,36 @@ path.N$lunar<- lunar.illumination(path.N$date, shift = 12)
 path.S$lunar<- lunar.illumination(path.S$date, shift = 12)
 
 
+##############################################
+### Add temperature and rainfall by region ###
+##############################################
+
+setwd("~/Documents/Snail Kite Project/Data/armadillos/Environ Data")
+
+#Load and wrangle data
+temp<- read.csv("caceres_corumba_2014e15.csv", as.is = T)
+temp<- temp %>% 
+  mutate(date.round = as.POSIXct(strptime(paste(data, hora.utc), format = "%d-%m-%Y %H",
+                                          tz = "UTC")),
+         .before = everything())
+
+#Create new col to store rounded datetimes
+path.N<- path.N %>% 
+  mutate(date.round = round_date(path.N$date, unit = "hour"), .before = state)
+path.S<- path.S %>% 
+  mutate(date.round = round_date(path.S$date, unit = "hour"), .before = state)
+
+#Merge data
+path.N<- left_join(path.N, temp[,c("date.round","t.ar","rain")], by = "date.round")
+path.S<- left_join(path.S, temp[,c("date.round","t.ar","rain")], by = "date.round")
+
+
 #############################################
 ### Explore relationships among variables ###
 #############################################
 
-PerformanceAnalytics::chart.Correlation(path.N[,c(2:4,9)])  #no strong corrs
-PerformanceAnalytics::chart.Correlation(path.S[,c(2:4,9)])  #no strong corrs
+PerformanceAnalytics::chart.Correlation(path.N[,c(2:4,10:12)])  #no strong corrs
+PerformanceAnalytics::chart.Correlation(path.S[,c(2:4,10:12)])  #no strong corrs
 
 
 ###################

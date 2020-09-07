@@ -1,14 +1,15 @@
 ### Visualize Results from Best Models ###
 
 library(ggridges)
+library(raster)
 
 ### North Pantanal
 
 ## Foraging
 
 #look at betas (convert to data frame)
-store.betas_Nforage<- data.frame(mod.forage_N1$betas[(nburn+1):ngibbs, ])
-names(store.betas_Nforage)<- c("int","dist2rd","slope","ndvi","lunar")
+store.betas_Nforage<- data.frame(mod.forage_N$betas[(nburn+1):ngibbs, ])
+names(store.betas_Nforage)<- c("int","dist2rd","slope","ndvi","t.ar","rain")
 store.betas.long_Nforage<- tidyr::pivot_longer(store.betas_Nforage,
                                                cols = names(store.betas_Nforage),
                                                names_to = "betas")
@@ -50,8 +51,8 @@ ggplot(store.betas.long_Nforage %>% filter(betas != "int"),aes(y=betas, x=value,
 ## Transit
 
 #look at betas (convert to data frame)
-store.betas_Ntransit<- data.frame(mod.transit_N1$betas[(nburn+1):ngibbs, ])
-names(store.betas_Ntransit)<- c("int","dist2rd","slope","ndvi","lunar")
+store.betas_Ntransit<- data.frame(mod.transit_N$betas[(nburn+1):ngibbs, ])
+names(store.betas_Ntransit)<- c("int","dist2rd","slope","ndvi","t.ar","rain")
 store.betas.long_Ntransit<- tidyr::pivot_longer(store.betas_Ntransit,
                                                cols = names(store.betas_Ntransit),
                                                names_to = "betas")
@@ -98,8 +99,8 @@ ggplot(store.betas.long_Ntransit %>% filter(betas != "int"), aes(y=betas, x=valu
 ## Foraging
 
 #look at betas (convert to data frame)
-store.betas_Sforage<- data.frame(mod.forage_S1$betas[(nburn+1):ngibbs, ])
-names(store.betas_Sforage)<- c("int","dist2rd","slope","ndvi","lunar")
+store.betas_Sforage<- data.frame(mod.forage_S$betas[(nburn+1):ngibbs, ])
+names(store.betas_Sforage)<- c("int","dist2rd","slope","ndvi","t.ar","rain")
 store.betas.long_Sforage<- tidyr::pivot_longer(store.betas_Sforage,
                                                cols = names(store.betas_Sforage),
                                                names_to = "betas")
@@ -141,8 +142,8 @@ ggplot(store.betas.long_Sforage %>% filter(betas != "int"),aes(y=betas, x=value,
 ## Transit
 
 #look at betas (convert to data frame)
-store.betas_Stransit<- data.frame(mod.transit_S1$betas[(nburn+1):ngibbs, ])
-names(store.betas_Stransit)<- c("int","dist2rd","slope","ndvi","lunar")
+store.betas_Stransit<- data.frame(mod.transit_S$betas[(nburn+1):ngibbs, ])
+names(store.betas_Stransit)<- c("int","dist2rd","slope","ndvi","t.ar","rain")
 store.betas.long_Stransit<- tidyr::pivot_longer(store.betas_Stransit,
                                                 cols = names(store.betas_Stransit),
                                                 names_to = "betas")
@@ -187,71 +188,112 @@ ggplot(store.betas.long_Stransit %>% filter(betas != "int"), aes(y=betas, x=valu
 
 
 
-#### Create Predictive Surfaces (dist2rd, ndvi, lunar) ####
+#### Create Predictive Surfaces (dist2rd, slope, ndvi, t.ar, rain) ####
 
 ## North Pantanal
 
 #extract beta coeffs (mean)
-betas_N<- colMeans(store.betas_N.df)
+betas.forage_N<- colMeans(store.betas_Nforage)
 
 #Need to center and scale raster values so comparable to beta coeffs
-### IMPROVE CODE SINCE COVARS.N IS GENERATED WITHIN ANOTHER SCRIPT
-covars.N2<- covars.N[[c("dist2rd","ndvi")]]
-covars.N2$dist2rd<- scale(covars.N2$dist2rd, center = T, scale = T)
-covars.N2$ndvi<- scale(covars.N2$ndvi, center = T, scale = T)
 
-scaled_lunar_N<- path.N$lunar %>% 
+#Load env raster data
+dist2rdN<- raster('dist2rd_N.tif')
+slopeN<- raster('slope_N.tif')
+ndviN<- raster('ndvi_N.tif')
+
+covars.N<- brick(dist2rdN, slopeN, ndviN)
+covars.N$dist2rd_N<- scale(covars.N$dist2rd_N, center = T, scale = T)
+covars.N$slope_N<- scale(covars.N$slope_N, center = T, scale = T)
+covars.N$ndvi_N<- scale(covars.N$ndvi_N, center = T, scale = T)
+
+# Mask all unused pixels (for foraging)
+ind_N<- unique(cellFromXY(slopeN, dat.N[, c("x","y")]))
+covars.N_masked<- covars.N
+covars.N_masked[setdiff(1:ncell(covars.N_masked), ind_N)] <- NA
+
+
+scaled_t.ar_N<- path.N$t.ar %>% 
   scale(center = T, scale = T) %>% 
   as.data.frame() %>% 
-  summarise(min=min(V1), mean=mean(V1), max=max(V1))
+  summarise(min=min(V1, na.rm = T), mean=mean(V1, na.rm = T), max=max(V1, na.rm = T))
+
+scaled_rain_N<- path.N$rain %>% 
+  scale(center = T, scale = T) %>% 
+  as.data.frame() %>% 
+  summarise(min=min(V1, na.rm = T), mean=mean(V1, na.rm = T), max=max(V1, na.rm = T))
 
 
+## Foraging ##
 
-##Perform raster math using beta coeffs (include intercept and beta coeff for lunar as constants)
+##Perform raster math using beta coeffs
 
-#New moon
-resistSurfN_new<- exp(
-  betas_N["int"] + 
-  betas_N["dist2rd"]*covars.N2$dist2rd + 
-  betas_N["ndvi"]*covars.N2$ndvi + 
-  betas_N["lunar"]*scaled_lunar_N$min  #for new moon
+#Min recorded temperature
+resistSurfN.forage_minTemp<- exp(
+  betas.forage_N["int"] + 
+  betas.forage_N["dist2rd"]*covars.N_masked$dist2rd_N + 
+  betas.forage_N["slope"]*covars.N_masked$slope_N + 
+  betas.forage_N["ndvi"]*covars.N_masked$ndvi_N + 
+  betas.forage_N["t.ar"]*scaled_t.ar_N$min +  #for min temp
+  betas.forage_N["rain"]*scaled_rain_N$mean  #for avg rainfall
   )
-resistSurfN_new.df<- as.data.frame(resistSurfN_new, xy=T) %>% 
-  mutate(phase = "New")
+resistSurfN.forage_minTemp.df<- as.data.frame(resistSurfN.forage_minTemp, xy=T) %>% 
+  mutate(temp.level = "Min")
 
-#Quarter moon
-resistSurfN_quarter<- exp(
-  betas_N["int"] + 
-    betas_N["dist2rd"]*covars.N2$dist2rd + 
-    betas_N["ndvi"]*covars.N2$ndvi + 
-    betas_N["lunar"]*scaled_lunar_N$mean  #for quarter moon
+#Avg recorded temperature
+resistSurfN.forage_avgTemp<- exp(
+  betas.forage_N["int"] + 
+    betas.forage_N["dist2rd"]*covars.N_masked$dist2rd_N + 
+    betas.forage_N["slope"]*covars.N_masked$slope_N + 
+    betas.forage_N["ndvi"]*covars.N_masked$ndvi_N + 
+    betas.forage_N["t.ar"]*scaled_t.ar_N$mean + #for min temp
+    betas.forage_N["rain"]*scaled_rain_N$mean  #for avg rainfall
 )
-resistSurfN_quarter.df<- as.data.frame(resistSurfN_quarter, xy=T) %>% 
-  mutate(phase = "Quarter")
+resistSurfN.forage_avgTemp.df<- as.data.frame(resistSurfN.forage_avgTemp, xy=T) %>% 
+  mutate(temp.level = "Avg")
 
-#Full moon
-resistSurfN_full<- exp(
-  betas_N["int"] + 
-    betas_N["dist2rd"]*covars.N2$dist2rd + 
-    betas_N["ndvi"]*covars.N2$ndvi + 
-    betas_N["lunar"]*scaled_lunar_N$max  #for full moon
+#Max recorded temperature
+resistSurfN.forage_maxTemp<- exp(
+  betas.forage_N["int"] + 
+    betas.forage_N["dist2rd"]*covars.N_masked$dist2rd_N + 
+    betas.forage_N["slope"]*covars.N_masked$slope_N + 
+    betas.forage_N["ndvi"]*covars.N_masked$ndvi_N + 
+    betas.forage_N["t.ar"]*scaled_t.ar_N$max + #for min temp
+    betas.forage_N["rain"]*scaled_rain_N$mean  #for avg rainfall
 )
-resistSurfN_full.df<- as.data.frame(resistSurfN_full, xy=T) %>% 
-  mutate(phase = "Full")
+resistSurfN.forage_maxTemp.df<- as.data.frame(resistSurfN.forage_maxTemp, xy=T) %>% 
+  mutate(temp.level = "Max")
 
 
 #Combine all results together for each level of lunar illumination
-resistSurfN.df<- rbind(resistSurfN_new.df, resistSurfN_quarter.df, resistSurfN_full.df)
-resistSurfN.df$phase<- factor(resistSurfN.df$phase, levels = c("New", "Quarter", "Full"))
+resistSurfN.forage.df<- rbind(resistSurfN.forage_minTemp.df, resistSurfN.forage_avgTemp.df,
+                              resistSurfN.forage_maxTemp.df)
+resistSurfN.forage.df$temp.level<- factor(resistSurfN.forage.df$temp.level,
+                                          levels = c("Min", "Avg", "Max"))
 
+#Load data to plot tracks
+dat<- read.csv("Armadillo HMM Results.csv", header = T, sep = ",")
+
+dat<- dat %>% 
+  rename(id = ID) %>% 
+  mutate_at("id", as.character) %>% 
+  mutate_at("state", as.factor) %>% 
+  mutate_at("state", ~recode(., '1' = "Burrow",
+                             '2' = "Foraging", '3' = "Transit"))
+dat$date<- lubridate::as_datetime(dat$date)
+
+# Separate tracks by region (N or S)
+dat.N<- dat %>% filter(region == "N")
+dat.S<- dat %>% filter(region == "S")
 
 ggplot() +
-  geom_tile(data = resistSurfN.df, aes(x, y, fill = layer)) +
-  scale_fill_viridis_c("Time Spent\nper Cell (s)", option = "inferno", na.value = "n") +
-  geom_point(data = dat.N, aes(x, y, color = id), size = 0.5, alpha = 0.2, show.legend = F) +
+  geom_tile(data = resistSurfN.forage.df, aes(x, y, fill = layer)) +
+  scale_fill_viridis_c("Time Spent\nper Cell (min)", option = "inferno", na.value = "n") +
+  # geom_point(data = dat.N %>% filter(state == "Foraging"), aes(x, y, color = id),
+  #            size = 0.5, alpha = 0.2, show.legend = F) +
   scale_x_continuous(expand = c(0,0)) +
   scale_y_continuous(expand = c(0,0)) +
-  labs(x="Easting", y="Northing", title = "North Pantanal Resistance Surface") +
+  labs(x="Easting", y="Northing", title = "North Pantanal Foraging Resistance Surface") +
   theme_bw() +
   coord_equal() +
   theme(legend.position = "bottom",
@@ -262,12 +304,83 @@ ggplot() +
         legend.title = element_text(size = 14),
         legend.text = element_text(size = 12)) +
   guides(fill = guide_colourbar(barwidth = 30, barheight = 1)) +
-  facet_wrap(~ phase)
+  facet_wrap(~ temp.level)
 
 
 
 
 
+## Transit ##
+
+##Perform raster math using beta coeffs
+
+#extract beta coeffs (mean)
+betas.transit_N<- colMeans(store.betas_Ntransit)
+
+#Min recorded temperature
+resistSurfN.transit_minTemp<- exp(
+  betas.transit_N["int"] + 
+    betas.transit_N["dist2rd"]*covars.N_masked$dist2rd_N + 
+    betas.transit_N["slope"]*covars.N_masked$slope_N + 
+    betas.transit_N["ndvi"]*covars.N_masked$ndvi_N + 
+    betas.transit_N["t.ar"]*scaled_t.ar_N$min +  #for min temp
+    betas.transit_N["rain"]*scaled_rain_N$mean  #for avg rainfall
+)
+resistSurfN.transit_minTemp.df<- as.data.frame(resistSurfN.transit_minTemp, xy=T) %>% 
+  mutate(temp.level = "Min")
+
+#Avg recorded temperature
+resistSurfN.transit_avgTemp<- exp(
+  betas.transit_N["int"] + 
+    betas.transit_N["dist2rd"]*covars.N_masked$dist2rd_N + 
+    betas.transit_N["slope"]*covars.N_masked$slope_N + 
+    betas.transit_N["ndvi"]*covars.N_masked$ndvi_N + 
+    betas.transit_N["t.ar"]*scaled_t.ar_N$mean + #for min temp
+    betas.transit_N["rain"]*scaled_rain_N$mean  #for avg rainfall
+)
+resistSurfN.transit_avgTemp.df<- as.data.frame(resistSurfN.transit_avgTemp, xy=T) %>% 
+  mutate(temp.level = "Avg")
+
+#Max recorded temperature
+resistSurfN.transit_maxTemp<- exp(
+  betas.transit_N["int"] + 
+    betas.transit_N["dist2rd"]*covars.N_masked$dist2rd_N + 
+    betas.transit_N["slope"]*covars.N_masked$slope_N + 
+    betas.transit_N["ndvi"]*covars.N_masked$ndvi_N + 
+    betas.transit_N["t.ar"]*scaled_t.ar_N$max + #for min temp
+    betas.transit_N["rain"]*scaled_rain_N$mean  #for avg rainfall
+)
+resistSurfN.transit_maxTemp.df<- as.data.frame(resistSurfN.transit_maxTemp, xy=T) %>% 
+  mutate(temp.level = "Max")
+
+
+#Combine all results together for each level of lunar illumination
+resistSurfN.transit.df<- rbind(resistSurfN.transit_minTemp.df, resistSurfN.transit_avgTemp.df,
+                              resistSurfN.transit_maxTemp.df)
+resistSurfN.transit.df$temp.level<- factor(resistSurfN.transit.df$temp.level,
+                                          levels = c("Min", "Avg", "Max"))
+
+
+
+ggplot() +
+  geom_tile(data = resistSurfN.transit.df, aes(x, y, fill = layer)) +
+  scale_fill_viridis_c("Time Spent\nper Cell (min)", option = "inferno", na.value = "n") +
+  # geom_point(data = dat.N %>% filter(state == "Transit"), aes(x, y, color = id),
+  #            size = 0.5, alpha = 0.2, show.legend = F) +
+  scale_x_continuous(expand = c(0,0)) +
+  scale_y_continuous(expand = c(0,0)) +
+  labs(x="Easting", y="Northing", title = "North Pantanal Transit Resistance Surface") +
+  theme_bw() +
+  coord_equal() +
+  theme(legend.position = "bottom",
+        axis.title = element_text(size = 18),
+        axis.text = element_text(size = 10),
+        strip.text = element_text(size = 16, face = "bold"),
+        plot.title = element_text(size = 22),
+        legend.title = element_text(size = 14),
+        legend.text = element_text(size = 12)) +
+  guides(fill = guide_colourbar(barwidth = 30, barheight = 1)) +
+  facet_wrap(~ temp.level)
 
 
 
@@ -275,71 +388,94 @@ ggplot() +
 ## South Pantanal
 
 #extract beta coeffs (mean)
-betas_S<- colMeans(store.betas_S.df)
+betas.forage_S<- colMeans(store.betas_Sforage)
 
-#Need to center and scale raster values so comparable to beta coeffs
-covars.S2<- covars.S[[c("dist2rd","ndvi")]]
-values(covars.S2$ndvi)[values(covars.S2$ndvi) < 0.2]<- NA  #Mask water on landscape
-covars.S2$dist2rd<- scale(covars.S2$dist2rd, center = T, scale = T)
-covars.S2$ndvi<- scale(covars.S2$ndvi, center = T, scale = T)
-dist_ndvi.rast<- covars.S2$dist2rd * covars.S2$ndvi
+#Seed to center and scale raster values so comparable to beta coeffs
 
-covars.S2<- stack(covars.S2, dist_ndvi.rast) %>% brick()
+#Load env raster data
+dist2rdS<- raster('dist2rd_S.tif')
+slopeS<- raster('slope_S.tif')
+ndviS<- raster('ndvi_S.tif')
 
-scaled_lunar_S<- path.S$lunar %>% 
+covars.S<- brick(dist2rdS, slopeS, ndviS)
+covars.S$dist2rd_S<- scale(covars.S$dist2rd_S, center = T, scale = T)
+covars.S$slope_S<- scale(covars.S$slope_S, center = T, scale = T)
+# values(covars.S$ndvi_S)[values(covars.S$ndvi_S) < 0.2]<- NA  #Mask water on landscape
+covars.S$ndvi_S<- scale(covars.S$ndvi_S, center = T, scale = T)
+
+# Mask all unused pixels (for foraging)
+ind_S<- unique(cellFromXY(slopeS, dat.S[, c("x","y")]))
+covars.S_masked<- covars.S
+covars.S_masked[setdiff(1:ncell(covars.S_masked), ind_S)] <- NA
+
+scaled_t.ar_S<- path.S$t.ar %>% 
   scale(center = T, scale = T) %>% 
   as.data.frame() %>% 
-  summarise(min=min(V1), mean=mean(V1), max=max(V1))
+  summarise(min=min(V1, na.rm = T), mean=mean(V1, na.rm = T), max=max(V1, na.rm = T))
+
+scaled_rain_S<- path.S$rain %>% 
+  scale(center = T, scale = T) %>% 
+  as.data.frame() %>% 
+  summarise(min=min(V1, na.rm = T), mean=mean(V1, na.rm = T), max=max(V1, na.rm = T))
 
 
-#Perform raster math using beta coeffs (include intercept and beta coeff for lunar as constants)
+## Foraging ##
 
-#New moon
-resistSurfS_new<- exp(
-  betas_S["int"] + 
-    betas_S["dist2rd"]*covars.S2$dist2rd + 
-    betas_S["ndvi"]*covars.S2$ndvi + 
-    betas_S["lunar"]*scaled_lunar_S$min +  #for new moon
-    betas_S["dist_ndvi"]*covars.S2$layer
+##Perform raster math using beta coeffs
+
+#Min recorded temperature
+resistSurfS.forage_minTemp<- exp(
+  betas.forage_S["int"] + 
+    betas.forage_S["dist2rd"]*covars.S_masked$dist2rd_S + 
+    betas.forage_S["slope"]*covars.S_masked$slope_S + 
+    betas.forage_S["ndvi"]*covars.S_masked$ndvi_S + 
+    betas.forage_S["t.ar"]*scaled_t.ar_S$min +  #for min temp
+    betas.forage_S["rain"]*scaled_rain_S$mean  #for avg rainfall
 )
-resistSurfS_new.df<- as.data.frame(resistSurfS_new, xy=T) %>% 
-  mutate(phase = "New")
+resistSurfS.forage_minTemp.df<- as.data.frame(resistSurfS.forage_minTemp, xy=T) %>% 
+  mutate(temp.level = "Min")
 
-#Quarter moon
-resistSurfS_quarter<- exp(
-  betas_S["int"] + 
-    betas_S["dist2rd"]*covars.S2$dist2rd + 
-    betas_S["ndvi"]*covars.S2$ndvi + 
-    betas_S["lunar"]*scaled_lunar_S$mean +  #for quarter moon
-    betas_S["dist_ndvi"]*covars.S2$layer
+#Avg recorded temperature
+resistSurfS.forage_avgTemp<- exp(
+  betas.forage_S["int"] + 
+    betas.forage_S["dist2rd"]*covars.S_masked$dist2rd_S + 
+    betas.forage_S["slope"]*covars.S_masked$slope_S + 
+    betas.forage_S["ndvi"]*covars.S_masked$ndvi_S + 
+    betas.forage_S["t.ar"]*scaled_t.ar_S$mean + #for min temp
+    betas.forage_S["rain"]*scaled_rain_S$mean  #for avg rainfall
 )
-resistSurfS_quarter.df<- as.data.frame(resistSurfS_quarter, xy=T) %>% 
-  mutate(phase = "Quarter")
+resistSurfS.forage_avgTemp.df<- as.data.frame(resistSurfS.forage_avgTemp, xy=T) %>% 
+  mutate(temp.level = "Avg")
 
-#Full moon
-resistSurfS_full<- exp(
-  betas_S["int"] + 
-    betas_S["dist2rd"]*covars.S2$dist2rd + 
-    betas_S["ndvi"]*covars.S2$ndvi + 
-    betas_S["lunar"]*scaled_lunar_S$max +  #for full moon
-    betas_S["dist_ndvi"]*covars.S2$layer
+#Max recorded temperature
+resistSurfS.forage_maxTemp<- exp(
+  betas.forage_S["int"] + 
+    betas.forage_S["dist2rd"]*covars.S_masked$dist2rd_S + 
+    betas.forage_S["slope"]*covars.S_masked$slope_S + 
+    betas.forage_S["ndvi"]*covars.S_masked$ndvi_S + 
+    betas.forage_S["t.ar"]*scaled_t.ar_S$max + #for min temp
+    betas.forage_S["rain"]*scaled_rain_S$mean  #for avg rainfall
 )
-resistSurfS_full.df<- as.data.frame(resistSurfS_full, xy=T) %>% 
-  mutate(phase = "Full")
+resistSurfS.forage_maxTemp.df<- as.data.frame(resistSurfS.forage_maxTemp, xy=T) %>% 
+  mutate(temp.level = "Max")
 
 
 #Combine all results together for each level of lunar illumination
-resistSurfS.df<- rbind(resistSurfS_new.df, resistSurfS_quarter.df, resistSurfS_full.df)
-resistSurfS.df$phase<- factor(resistSurfS.df$phase, levels = c("New", "Quarter", "Full"))
+resistSurfS.forage.df<- rbind(resistSurfS.forage_minTemp.df, resistSurfS.forage_avgTemp.df,
+                              resistSurfS.forage_maxTemp.df)
+resistSurfS.forage.df$temp.level<- factor(resistSurfS.forage.df$temp.level,
+                                          levels = c("Min", "Avg", "Max"))
+
 
 
 ggplot() +
-  geom_tile(data = resistSurfS.df, aes(x, y, fill = layer)) +
-  scale_fill_viridis_c("Time Spent\nper Cell (s)", option = "inferno", na.value = "n") +
-  geom_point(data = dat.S, aes(x, y, color = id), size = 0.5, alpha = 0.2, show.legend = F) +
+  geom_tile(data = resistSurfS.forage.df, aes(x, y, fill = layer)) +
+  scale_fill_viridis_c("Time Spent\nper Cell (min)", option = "inferno", na.value = "n") +
+  # geom_point(data = dat.S %>% filter(state == "Foraging"), aes(x, y, color = id),
+  #            size = 0.5, alpha = 0.2, show.legend = F) +
   scale_x_continuous(expand = c(0,0)) +
   scale_y_continuous(expand = c(0,0)) +
-  labs(x="Easting", y="Northing", title = "South Pantanal Resistance Surface") +
+  labs(x="Easting", y="Northing", title = "South Pantanal Foraging Resistance Surface") +
   theme_bw() +
   coord_equal() +
   theme(legend.position = "bottom",
@@ -350,4 +486,80 @@ ggplot() +
         legend.title = element_text(size = 14),
         legend.text = element_text(size = 12)) +
   guides(fill = guide_colourbar(barwidth = 30, barheight = 1)) +
-  facet_wrap(~ phase)
+  facet_wrap(~ temp.level)
+
+
+
+
+
+## Transit ##
+
+##Perform raster math using beta coeffs
+
+#extract beta coeffs (mean)
+betas.transit_S<- colMeans(store.betas_Stransit)
+
+#Min recorded temperature
+resistSurfS.transit_minTemp<- exp(
+  betas.transit_S["int"] + 
+    betas.transit_S["dist2rd"]*covars.S_masked$dist2rd_S + 
+    betas.transit_S["slope"]*covars.S_masked$slope_S + 
+    betas.transit_S["ndvi"]*covars.S_masked$ndvi_S + 
+    betas.transit_S["t.ar"]*scaled_t.ar_S$min +  #for min temp
+    betas.transit_S["rain"]*scaled_rain_S$mean  #for avg rainfall
+)
+resistSurfS.transit_minTemp.df<- as.data.frame(resistSurfS.transit_minTemp, xy=T) %>% 
+  mutate(temp.level = "Min")
+
+#Avg recorded temperature
+resistSurfS.transit_avgTemp<- exp(
+  betas.transit_S["int"] + 
+    betas.transit_S["dist2rd"]*covars.S_masked$dist2rd_S + 
+    betas.transit_S["slope"]*covars.S_masked$slope_S + 
+    betas.transit_S["ndvi"]*covars.S_masked$ndvi_S + 
+    betas.transit_S["t.ar"]*scaled_t.ar_S$mean + #for min temp
+    betas.transit_S["rain"]*scaled_rain_S$mean  #for avg rainfall
+)
+resistSurfS.transit_avgTemp.df<- as.data.frame(resistSurfS.transit_avgTemp, xy=T) %>% 
+  mutate(temp.level = "Avg")
+
+#Max recorded temperature
+resistSurfS.transit_maxTemp<- exp(
+  betas.transit_S["int"] + 
+    betas.transit_S["dist2rd"]*covars.S_masked$dist2rd_S + 
+    betas.transit_S["slope"]*covars.S_masked$slope_S + 
+    betas.transit_S["ndvi"]*covars.S_masked$ndvi_S + 
+    betas.transit_S["t.ar"]*scaled_t.ar_S$max + #for min temp
+    betas.transit_S["rain"]*scaled_rain_S$mean  #for avg rainfall
+)
+resistSurfS.transit_maxTemp.df<- as.data.frame(resistSurfS.transit_maxTemp, xy=T) %>% 
+  mutate(temp.level = "Max")
+
+
+#Combine all results together for each level of lunar illumination
+resistSurfS.transit.df<- rbind(resistSurfS.transit_minTemp.df, resistSurfS.transit_avgTemp.df,
+                               resistSurfS.transit_maxTemp.df)
+resistSurfS.transit.df$temp.level<- factor(resistSurfS.transit.df$temp.level,
+                                           levels = c("Min", "Avg", "Max"))
+
+
+
+ggplot() +
+  geom_tile(data = resistSurfS.transit.df, aes(x, y, fill = layer)) +
+  scale_fill_viridis_c("Time Spent\nper Cell (min)", option = "inferno", na.value = "n") +
+  # geom_point(data = dat.S %>% filter(state == "Transit"), aes(x, y, color = id),
+  #            size = 0.5, alpha = 0.2, show.legend = F) +
+  scale_x_continuous(expand = c(0,0)) +
+  scale_y_continuous(expand = c(0,0)) +
+  labs(x="Easting", y="Northing", title = "South Pantanal Transit Resistance Surface") +
+  theme_bw() +
+  coord_equal() +
+  theme(legend.position = "bottom",
+        axis.title = element_text(size = 18),
+        axis.text = element_text(size = 10),
+        strip.text = element_text(size = 16, face = "bold"),
+        plot.title = element_text(size = 22),
+        legend.title = element_text(size = 14),
+        legend.text = element_text(size = 12)) +
+  guides(fill = guide_colourbar(barwidth = 30, barheight = 1)) +
+  facet_wrap(~ temp.level)
