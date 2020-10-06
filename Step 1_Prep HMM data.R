@@ -39,27 +39,82 @@ setwd("~/Documents/Snail Kite Project/Data/armadillos/Environ Data")
 rast<- dir(getwd(), "*.tif$")
 for (i in rast) assign(i, raster(i))
 
-plot(EucDist_cerc_Copy.tif); points(dat.N$x, dat.N$y)
-plot(EucDist_cercaAm.tif); points(dat.S$x, dat.S$y)
 
-#Need to project rasters same as tracks
-EucDist_cerc_Copy.tif<- projectRaster(EucDist_cerc_Copy.tif, crs = "+init=epsg:32721")
-crs(EucDist_cercaAm.tif)<- crs(EucDist_cerc_Copy.tif)
+### Modify LU/LC TIFFs 
+
+#Extract names for each LU/LC type and group similar ones together
+class.N<- classes_DL_padrao.tif@data@attributes[[1]]$SPRCLASSE
+class.S<- classes_ST.tif@data@attributes[[1]]$SPRCLASSE
+class.S<- c("Campo", NA, "Mata", "Agua", "Pasto", NA, "Estrada")
+
+classes_DL_padrao.tif<- projectRaster(classes_DL_padrao.tif, crs = "+init=epsg:32721")
+crs(classes_ST.tif)<- crs(classes_DL_padrao.tif)
+
+#Viz rasters
+plot(classes_DL_padrao.tif)
+plot(classes_ST.tif)
 
 
-## Aggregate spatial data to same scale (which will likely be 30m)
-res(EucDist_cercaAm.tif) #1m 1m
-dist2rdS_30m<- raster::aggregate(EucDist_cercaAm.tif,
-                                 fact = 30,
-                                 fun = mean)
+#Simplify LU/LC values of Southern site to 5 instead of 7 values  (change all to )
+classes_ST.tif[classes_ST.tif == 2] <- 3
+classes_ST.tif[classes_ST.tif == 6] <- 3
 
-res(EucDist_cerc_Copy.tif) #13m 13m
-#create dummy raster at same extent and proj, but with desired resolution
-ex.ras<- raster(ext = extent(EucDist_cerc_Copy.tif), crs = "+init=epsg:32721", res = 30)
-dist2rdN_30m<- resample(EucDist_cerc_Copy.tif, ex.ras, method = "bilinear")
-# dist2rdN_30m<- raster::aggregate(EucDist_cerc_Copy.tif,
-#                                  fact = 2,
+#create custom function to downsample raster for factor
+w_agg <- function(x, na.rm=TRUE, ...) {
+  i <- is.na(x)
+  if ((!na.rm) | all(i)) {
+    return(NA)
+  }
+  x <- x[!i]
+  y <- rep(x, weight[x])
+  # to get the same results as with your function you need
+  # sort, such that the ties are treated the same way
+  # y <- sort(y)
+  modal(y)
+}
+
+res(classes_DL_padrao.tif) #1m 1m
+weight<- c(1, 3, 10, 3, 3, 3)  # modify weighting so that Pasto doesn't dominate aggregation
+                               # emphasize classification of roads by weighting highest
+lulcN_30m<- raster::aggregate(classes_DL_padrao.tif,
+                              fact = 30,
+                              fun = w_agg)
+plot(lulcN_30m); points(dat.N$x, dat.N$y)
+
+
+res(classes_ST.tif) #1m 1m
+weight<- c(1, 1, 1, 3, 1, 1, 5)  # modify weighting so that Campo, Mata, and Pasto don't dominate
+lulcS_30m<- raster::aggregate(classes_ST.tif,
+                              fact = 30,
+                              fun = w_agg)
+plot(lulcS_30m); points(dat.S$x, dat.S$y)
+
+
+
+
+### Distance-to-road
+
+# plot(EucDist_cerc_Copy.tif); points(dat.N$x, dat.N$y)
+# plot(EucDist_cercaAm.tif); points(dat.S$x, dat.S$y)
+# 
+# #Need to project rasters same as tracks
+# EucDist_cerc_Copy.tif<- projectRaster(EucDist_cerc_Copy.tif, crs = "+init=epsg:32721")
+# crs(EucDist_cercaAm.tif)<- crs(EucDist_cerc_Copy.tif)
+# 
+# 
+# ## Aggregate spatial data to same scale (which will likely be 30m)
+# res(EucDist_cercaAm.tif) #1m 1m
+# dist2rdS_30m<- raster::aggregate(EucDist_cercaAm.tif,
+#                                  fact = 30,
 #                                  fun = mean)
+# 
+# res(EucDist_cerc_Copy.tif) #13m 13m
+# #create dummy raster at same extent and proj, but with desired resolution
+# ex.ras<- raster(ext = extent(EucDist_cerc_Copy.tif), crs = "+init=epsg:32721", res = 30)
+# dist2rdN_30m<- resample(EucDist_cerc_Copy.tif, ex.ras, method = "bilinear")
+# # dist2rdN_30m<- raster::aggregate(EucDist_cerc_Copy.tif,
+# #                                  fact = 2,
+# #                                  fun = mean)
 
 # Create dummy rasters for extent of each region (with buffer) to crop down rasters
 
@@ -69,8 +124,11 @@ rast.N<- raster(ext=extent(c(min(dat.N$x) - 30, max(dat.N$x) + 30, min(dat.N$y) 
                 crs = "+init=epsg:32721",
                 res = 30)
 values(rast.N)<- 0
-dist2rdN_30m<- crop(dist2rdN_30m, rast.N)
-plot(dist2rdN_30m); points(dat.N$x, dat.N$y)
+# dist2rdN_30m<- crop(dist2rdN_30m, rast.N)
+# plot(dist2rdN_30m); points(dat.N$x, dat.N$y)
+
+lulcN_30m<- crop(lulcN_30m, rast.N)
+plot(lulcN_30m); points(dat.N$x, dat.N$y)
 
 #South
 rast.S<- raster(ext=extent(c(min(dat.S$x) - 30, max(dat.S$x) + 30, min(dat.S$y) - 30,
@@ -78,8 +136,11 @@ rast.S<- raster(ext=extent(c(min(dat.S$x) - 30, max(dat.S$x) + 30, min(dat.S$y) 
                 crs = "+init=epsg:32721",
                 res = 30)
 values(rast.S)<- 0
-dist2rdS_30m<- crop(dist2rdS_30m, rast.S)
-plot(dist2rdS_30m); points(dat.S$x, dat.S$y)
+# dist2rdS_30m<- crop(dist2rdS_30m, rast.S)
+# plot(dist2rdS_30m); points(dat.S$x, dat.S$y)
+
+lulcS_30m<- crop(lulcS_30m, rast.S)
+plot(lulcS_30m); points(dat.S$x, dat.S$y)
 
 
 
@@ -92,14 +153,14 @@ slope.N = terrain(dem_N.tif, opt='slope', unit = "degrees")
 slope.S = terrain(dem_S.tif, opt='slope', unit = "degrees")
 
 #resample DEMs to 30m from 18m; they will now share the same dimensions and extent
-slope.N<- resample(slope.N, dist2rdN_30m, method = "bilinear")
-compareRaster(dist2rdN_30m, slope.N)  #check if same extent, dimensions, projection, resolution,
+slope.N<- resample(slope.N, lulcN_30m, method = "bilinear")
+compareRaster(lulcN_30m, slope.N)  #check if same extent, dimensions, projection, resolution,
 #and origin
 plot(slope.N); points(dat.N$x, dat.N$y)
 
 #resample DEMs to 30m from 18m; they will now share the same dimensions and extent
-slope.S<- resample(slope.S, dist2rdS_30m, method = "bilinear")
-compareRaster(dist2rdS_30m, slope.S)
+slope.S<- resample(slope.S, lulcS_30m, method = "bilinear")
+compareRaster(lulcS_30m, slope.S)
 plot(slope.S); points(dat.S$x, dat.S$y)
 
 
@@ -108,38 +169,42 @@ plot(slope.S); points(dat.S$x, dat.S$y)
 ### Import NDVI layers ###
 ##########################
 
-setwd("~/Documents/Snail Kite Project/Data/armadillos/NDVI")
-
-#load files
-ndvi.filenames<- list.files(getwd(), pattern = "*.grd$")
-ndvi.N<- brick(ndvi.filenames[1])
-ndvi.S<- brick(ndvi.filenames[2])
-
-#change extent and dimensions of RasterBricks using resample()
-ndvi.N<- resample(ndvi.N, dist2rdN_30m, method = "bilinear")
-compareRaster(dist2rdN_30m, ndvi.N)
-plot(ndvi.N[[1]]); points(dat.N$x, dat.N$y)
-
-#change extent and dimensions of RasterBricks using resample()
-ndvi.S<- resample(ndvi.S, dist2rdS_30m, method = "bilinear")
-compareRaster(dist2rdS_30m, ndvi.S)
-plot(ndvi.S[[1]]); points(dat.S$x, dat.S$y)
-
-
-### *TEMPORARY* take mean NDVI for all rasters over study period at each site
-ndvi.N.mean<- mean(ndvi.N, na.rm = T)
-ndvi.S.mean<- mean(ndvi.S, na.rm = T)
+# setwd("~/Documents/Snail Kite Project/Data/armadillos/NDVI")
+# 
+# #load files
+# ndvi.filenames<- list.files(getwd(), pattern = "*.grd$")
+# ndvi.N<- brick(ndvi.filenames[1])
+# ndvi.S<- brick(ndvi.filenames[2])
+# 
+# #change extent and dimensions of RasterBricks using resample()
+# ndvi.N<- resample(ndvi.N, dist2rdN_30m, method = "bilinear")
+# compareRaster(dist2rdN_30m, ndvi.N)
+# plot(ndvi.N[[1]]); points(dat.N$x, dat.N$y)
+# 
+# #change extent and dimensions of RasterBricks using resample()
+# ndvi.S<- resample(ndvi.S, dist2rdS_30m, method = "bilinear")
+# compareRaster(dist2rdS_30m, ndvi.S)
+# plot(ndvi.S[[1]]); points(dat.S$x, dat.S$y)
+# 
+# 
+# ### *TEMPORARY* take mean NDVI for all rasters over study period at each site
+# ndvi.N.mean<- mean(ndvi.N, na.rm = T)
+# ndvi.S.mean<- mean(ndvi.S, na.rm = T)
 
 
 ###########################################
 ### Merge static covars as RasterBricks ###
 ###########################################
 
-covars.N<- brick(dist2rdN_30m, slope.N, ndvi.N.mean)
-names(covars.N)<- c("dist2rd", "slope", "ndvi")
+# covars.N<- brick(dist2rdN_30m, slope.N, ndvi.N.mean)
+# names(covars.N)<- c("dist2rd", "slope", "ndvi")
+covars.N<- brick(lulcN_30m, slope.N)
+names(covars.N)<- c("lulc", "slope")
 
-covars.S<- brick(dist2rdS_30m, slope.S, ndvi.S.mean)
-names(covars.S)<- c("dist2rd", "slope", "ndvi")
+# covars.S<- brick(dist2rdS_30m, slope.S, ndvi.S.mean)
+# names(covars.S)<- c("dist2rd", "slope", "ndvi")
+covars.S<- brick(lulcS_30m, slope.S)
+names(covars.S)<- c("lulc", "slope")
 
 
 #######################################################
@@ -190,8 +255,10 @@ path.S<- left_join(path.S, temp[,c("date.round","t.ar","rain")], by = "date.roun
 ### Explore relationships among variables ###
 #############################################
 
-PerformanceAnalytics::chart.Correlation(path.N[,c(2:4,10:12)])  #no strong corrs
-PerformanceAnalytics::chart.Correlation(path.S[,c(2:4,10:12)])  #no strong corrs
+# PerformanceAnalytics::chart.Correlation(path.N[,c(2:4,10:12)])  #no strong corrs
+# PerformanceAnalytics::chart.Correlation(path.S[,c(2:4,10:12)])  #no strong corrs
+PerformanceAnalytics::chart.Correlation(path.N[,c(3,9:10)])  #no strong corrs
+PerformanceAnalytics::chart.Correlation(path.S[,c(3,9:10)])  #no strong corrs
 
 
 ###################
@@ -204,14 +271,20 @@ setwd("~/Documents/Snail Kite Project/Data/R Scripts/ValleLabUF/resist")
 # write.csv(path.N, "N Armadillo Resistance Data.csv", row.names = F)
 # write.csv(path.S, "S Armadillo Resistance Data.csv", row.names = F)
 
+# write.csv(path.N, "N Armadillo Resistance Data_LULC.csv", row.names = F)
+# write.csv(path.S, "S Armadillo Resistance Data_LULC.csv", row.names = F)
+
 
 # Environmental Layers
 #North
 # writeRaster(dist2rdN_30m, filename='dist2rd_N.tif', format="GTiff", overwrite=TRUE)
 # writeRaster(slope.N, filename='slope_N.tif', format="GTiff", overwrite=TRUE)
 # writeRaster(ndvi.N.mean, filename='ndvi_N.tif', format="GTiff", overwrite=TRUE)
+# writeRaster(lulcN_30m, filename='lulc_N.tif', format="GTiff", overwrite=TRUE)
+
 # 
 # #South
 # writeRaster(dist2rdS_30m, filename='dist2rd_S.tif', format="GTiff", overwrite=TRUE)
 # writeRaster(slope.S, filename='slope_S.tif', format="GTiff", overwrite=TRUE)
 # writeRaster(ndvi.S.mean, filename='ndvi_S.tif', format="GTiff", overwrite=TRUE)
+# writeRaster(lulcS_30m, filename='lulc_S.tif', format="GTiff", overwrite=TRUE)
