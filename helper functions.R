@@ -32,21 +32,16 @@ df.to.list = function(dat, ind) {  #ind must be in quotes
 # }
 
 #----------------------------
-extract.covars = function(dat, layers, state.col) {
+extract.covars.internal = function(dat, layers, state.col) {
   ## dat = data frame containing at least the id, coordinates (x,y), and date-time
   ## layers = a RasterStack or RasterBrick object containing environ covars
   ## state.col = character. The name of the column that contains behavioral states w/in
   ##             dat (if present)
   
   
-  path<- list()
-  ind<- unique(dat$id)
-  
-  for (i in 1:dplyr::n_distinct(dat$id)) {
-    
     #Subset and prep data
     tmp<- dat %>% 
-      dplyr::filter(id == ind[i]) %>% 
+      # dplyr::filter(id == ind[i]) %>% 
       dplyr::mutate(dt = difftime(date, dplyr::lag(date, 1), units = "secs")) %>% 
       dplyr::mutate_at("dt", {. %>% 
           as.numeric() %>%
@@ -65,9 +60,10 @@ extract.covars = function(dat, layers, state.col) {
       
       tmp1<- raster::extract(layers, segment, along = TRUE, cellnumbers = FALSE) %>% 
         purrr::map(., ~matrix(., ncol = nlayers(layers))) %>% 
-        map_dfr(., as_data_frame, .id = "seg.id") %>% 
-        mutate(seg.id = j-1, dt = NA, id = ind[i], date = tmp$date[j-1],
-               state = tmp[j-1,state.col])
+        purrr::map_dfr(., as_data_frame, .id = "seg.id") %>% 
+        dplyr::mutate(seg.id = j-1, dt = NA, id = unique(dat$id), date = tmp$date[j-1],
+               state = tmp[j-1,state.col]) %>% 
+        as.data.frame()
       
       tmp1[nrow(tmp1),"dt"]<- as.numeric(tmp$dt[j-1])
       names(tmp1)[2:(1 + nlayers(layers))]<- names(layers)
@@ -75,18 +71,29 @@ extract.covars = function(dat, layers, state.col) {
       extr.covar<- rbind(extr.covar, tmp1)
     }
     
-    #Store results from each ID
-    path[[i]]<- extr.covar
-  }
+    extr.covar
+}
+
+#----------------------------
+extract.covars = function(data, layers, state.col) {
+  ## data must be a data frame with "id" column, coords labeled "x" and "y" and datetime as POSIXct labeled "date"; optionally can have column that specifies behavioral state
   
-  names(path)<- ind
+  dat.list<- bayesmove::df_to_list(data, "id")
+  
+  tictoc::tic()
+  path<- furrr::future_map(dat.list, ~extract.covars.internal(dat = .x, layers = layers,
+                                                       state.col = "state"),
+                           .progress = TRUE, .options = future_options(seed = TRUE))
+  tictoc::toc()
+  
+  
   if (length(path) > 1) {  #adjust seg.id so each is unique across all IDs
     for (i in 2:length(path)) {
       path[[i]]$seg.id<- path[[i]]$seg.id + max(path[[i-1]]$seg.id)
     }
   }
-  path<- bind_rows(path)
   
+  path<- dplyr::bind_rows(path)
   
   path
 }

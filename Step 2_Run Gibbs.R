@@ -4,7 +4,6 @@ library(dplyr)
 library(ggplot2)
 library(tidyr)
 library(tictoc)
-library(splines)
 
 source('gibbs_resist.R')
 source('gibbs_resist_func.R')
@@ -14,14 +13,14 @@ sourceCpp('resist_aux.cpp')
 
 
 # N and S IDs separated
-path.N<- read.csv('N Armadillo Resistance Data.csv', as.is=T)
-path.S<- read.csv('S Armadillo Resistance Data.csv', as.is=T)
+path.N<- read.csv('N Armadillo Resistance Data_LULC.csv', as.is=T)
+path.S<- read.csv('S Armadillo Resistance Data_LULC.csv', as.is=T)
 
 path.N$dt<- path.N$dt/60  #convert to min from sec
 path.S$dt<- path.S$dt/60
 
-# path.N$lulc<- factor(path.N$lulc)  #convert to factor for analysis
-# path.S$lulc<- factor(path.S$lulc)
+path.N$lulc<- factor(path.N$lulc)  #convert to factor for analysis
+path.S$lulc<- factor(path.S$lulc)
 
 
 # Filter data for only steps with 3 >= dt >= 7 min
@@ -47,54 +46,23 @@ path.S.transit<- path.S %>%
 
 # Center and Scale covariates 
 path.N.forage<- path.N.forage %>% 
-  mutate_at(c("dist2rd","slope", "ndvi","t.ar","rain"),
+  mutate_at(c("slope","t.ar","rain"),
             ~scale(., center = TRUE, scale = TRUE)) %>% 
   drop_na(t.ar)
 path.N.transit<- path.N.transit %>% 
-  mutate_at(c("dist2rd","slope", "ndvi","t.ar","rain"),
+  mutate_at(c("slope","t.ar","rain"),
             ~scale(., center = TRUE, scale = TRUE)) %>% 
   drop_na(t.ar)
 
 path.S.forage<- path.S.forage %>% 
-  mutate_at(c("dist2rd","slope", "ndvi","t.ar","rain"),
+  mutate_at(c("slope","t.ar","rain"),
             ~scale(., center = TRUE, scale = TRUE)) %>% 
   drop_na(t.ar)
 path.S.transit<- path.S.transit %>% 
-  mutate_at(c("dist2rd","slope", "ndvi","t.ar","rain"),
+  mutate_at(c("slope","t.ar","rain"),
             ~scale(., center = TRUE, scale = TRUE)) %>% 
   drop_na(t.ar)
 
-
-
-# Add B-spline (w/ 2 internal knots) for 'dist2rd'
-rango<- range(path.N.forage$dist2rd)
-knot.locs<- seq(rango[1], rango[2], length.out = 4)[2:3]
-spline.N.forage<- as.data.frame(bs(path.N.forage$dist2rd, degree=2, intercept = FALSE,
-                                   knots = knot.locs))
-names(spline.N.forage)<- paste("spline", 1:ncol(spline.N.forage), sep = ".")
-path.N.forage<- cbind(path.N.forage, spline.N.forage)
-
-rango<- range(path.N.transit$dist2rd)
-knot.locs<- seq(rango[1], rango[2], length.out = 4)[2:3]
-spline.N.transit<- as.data.frame(bs(path.N.transit$dist2rd, degree=2, intercept = FALSE,
-                                    knots = knot.locs))
-names(spline.N.transit)<- paste("spline", 1:ncol(spline.N.transit), sep = ".")
-path.N.transit<- cbind(path.N.transit, spline.N.transit)
-
-
-rango<- range(path.S.forage$dist2rd)
-knot.locs<- seq(rango[1], rango[2], length.out = 4)[2:3]
-spline.S.forage<- as.data.frame(bs(path.S.forage$dist2rd, degree=2, intercept = FALSE,
-                                   knots = knot.locs))
-names(spline.S.forage)<- paste("spline", 1:ncol(spline.S.forage), sep = ".")
-path.S.forage<- cbind(path.S.forage, spline.S.forage)
-
-rango<- range(path.S.transit$dist2rd)
-knot.locs<- seq(rango[1], rango[2], length.out = 4)[2:3]
-spline.S.transit<- as.data.frame(bs(path.S.transit$dist2rd, degree=2, intercept = FALSE,
-                                    knots = knot.locs))
-names(spline.S.transit)<- paste("spline", 1:ncol(spline.S.transit), sep = ".")
-path.S.transit<- cbind(path.S.transit, spline.S.transit)
 
 
 
@@ -106,13 +74,20 @@ path.S.transit<- cbind(path.S.transit, spline.S.transit)
 
 ## Foraging
 
-ind<- c("slope", "ndvi","t.ar","rain",
-        paste("spline", 1:ncol(spline.N.forage), sep = "."))
-# mat.N.forage<- model.matrix(~path.N.forage$lulc + 0)
-# colnames(mat.N.forage)<- c("Pasture", "HQ", "Fence", "Water", "Cane", "Forest")
-# ref.forage.N<- which.max(colSums(mat.N.forage))
-# xmat<- data.matrix(cbind(1, mat.N.forage[,-ref.forage.N], path.N.forage[,ind]))
-xmat<- data.matrix(cbind(1, path.N.forage[,ind]))
+#remove infrequently used land cover classes
+table(path.N.forage$lulc)  #HQ (2) and water (4) both < 15 obs
+cond.N<- unique(path.N.forage[path.N.forage$lulc == 2 | path.N.forage$lulc == 4, "seg.id"])
+path.N.forage<- path.N.forage[!(path.N.forage$seg.id %in% cond.N),]
+
+#Update factor levels of LULC to reflect removal of classes
+path.N.forage$lulc<- factor(as.character(path.N.forage$lulc))
+
+ind<- c("slope","t.ar","rain")
+mat.N.forage<- model.matrix(~path.N.forage$lulc + 0)
+colnames(mat.N.forage)<- c("Pasture", "Fence", "Cane", "Forest")
+xmat<- data.matrix(cbind(1, mat.N.forage[,-2], path.N.forage[,ind]))
+
+
 
 #reformat seg.id so it is consecutive and numeric
 path.N.forage$seg.id<- factor(path.N.forage$seg.id) 
@@ -129,7 +104,7 @@ cond=!is.na(path.N.forage$dt)
 ysoma=path.N.forage[cond,'dt']
   
 #model args
-ngibbs=5000
+ngibbs=2000
 nburn=ngibbs/2
 w=0.1
 MaxIter=10000
@@ -143,7 +118,7 @@ set.seed(2)
 mod.forage_N<- gibbs_resist(ysoma = ysoma, xmat = xmat, seg.id = seg.id,
                      ngibbs = ngibbs, nburn = nburn, var.betas = var.betas,
                      w = w, MaxIter = MaxIter)
-# takes 16 min to run (for 5000 iter)
+# takes 4 min to run (for 2000 iter)
 
 
 
@@ -151,13 +126,20 @@ mod.forage_N<- gibbs_resist(ysoma = ysoma, xmat = xmat, seg.id = seg.id,
 
 ## Transit
 
-ind<- c("slope", "ndvi","t.ar","rain",
-        paste("spline", 1:ncol(spline.N.transit), sep = "."))
-# mat.N.transit<- model.matrix(~path.N.transit$lulc + 0)
-# colnames(mat.N.transit)<- c("Pasture", "HQ", "Fence", "Water", "Cane", "Forest")
-# ref.transit.N<- which.max(colSums(mat.N.transit))
-# xmat<- data.matrix(cbind(1, mat.N.transit[,-ref.transit.N], path.N.transit[,ind]))
-xmat<- data.matrix(cbind(1, path.N.transit[,ind]))
+#remove infrequently used land cover classes
+table(path.N.transit$lulc)  #although HQ (2) and forest (6) have < 30 obs and water (4) has 0 obs
+                            #, will only remove HQ and water to match 'forage' model
+cond.N<- unique(path.N.transit[path.N.transit$lulc == 2 | path.N.transit$lulc == 4, "seg.id"])
+path.N.transit<- path.N.transit[!(path.N.transit$seg.id %in% cond.N),]
+
+#Update factor levels of LULC to reflect removal of classes
+path.N.transit$lulc<- factor(as.character(path.N.transit$lulc))
+
+ind<- c("slope","t.ar","rain")
+mat.N.transit<- model.matrix(~path.N.transit$lulc + 0)
+colnames(mat.N.transit)<- c("Pasture", "Fence", "Cane", "Forest")
+xmat<- data.matrix(cbind(1, mat.N.transit[,-2], path.N.transit[,ind]))
+
 
 
 #reformat seg.id so it is consecutive and numeric
@@ -175,7 +157,7 @@ cond=!is.na(path.N.transit$dt)
 ysoma=path.N.transit[cond,'dt']
 
 #model args
-ngibbs=5000
+ngibbs=2000
 nburn=ngibbs/2
 w=0.1
 MaxIter=10000
@@ -187,9 +169,9 @@ var.betas=rep(10,ncol(xmat)) #changed
 #Run model
 set.seed(2)
 mod.transit_N<- gibbs_resist(ysoma = ysoma, xmat = xmat, seg.id = seg.id,
-                             ngibbs = ngibbs, nburn = nburn, var.betas = var.betas,
-                             w = w, MaxIter = MaxIter)
-# takes 10 min to run (for 5000 iter)
+                            ngibbs = ngibbs, nburn = nburn, var.betas = var.betas,
+                            w = w, MaxIter = MaxIter)
+# takes 2 min to run (for 2000 iter)
 
 
 
@@ -204,18 +186,25 @@ mod.transit_N<- gibbs_resist(ysoma = ysoma, xmat = xmat, seg.id = seg.id,
 ######################
 
 ### Group 'Campo' and 'Pasto' together to try fixing autocorr issue
-# path.S.forage<- path.S.forage %>% 
-#   mutate_at("lulc", ~recode(., '5' = '1'))
-# path.S.transit<- path.S.transit %>% 
-#   mutate_at("lulc", ~recode(., '5' = '1'))
+path.S.forage<- path.S.forage %>%
+  mutate_at("lulc", ~recode(., '5' = '1'))
+path.S.transit<- path.S.transit %>%
+  mutate_at("lulc", ~recode(., '5' = '1'))
 
-ind<- c("slope", "ndvi","t.ar","rain",
-        paste("spline", 1:ncol(spline.S.forage), sep = "."))
-# mat.S.forage<- model.matrix(~path.S.forage$lulc + 0)
-# colnames(mat.S.forage)<- c("Field", "Woods", "Water", "Road")
-# ref.forage.S<- which.max(colSums(mat.S.forage))
-# xmat<- data.matrix(cbind(1, mat.S.forage[,-ref.forage.S], path.S.forage[,ind]))
-xmat<- data.matrix(cbind(1, path.S.forage[,ind]))
+
+
+#remove infrequently used land cover classes
+table(path.S.forage$lulc)  #water (4) < 10 obs
+cond.S<- unique(path.S.forage[path.S.forage$lulc == 4, "seg.id"])
+path.S.forage<- path.S.forage[!(path.S.forage$seg.id %in% cond.S),]
+
+#Update factor levels of LULC to reflect removal of classes
+path.S.forage$lulc<- factor(as.character(path.S.forage$lulc))
+
+ind<- c("slope","t.ar","rain")
+mat.S.forage<- model.matrix(~path.S.forage$lulc + 0)
+colnames(mat.S.forage)<- c("Pasture","Forest","Road")
+xmat<- data.matrix(cbind(1, mat.S.forage[,-3], path.S.forage[,ind]))
 
 #reformat seg.id so it is consecutive and numeric
 path.S.forage$seg.id<- factor(path.S.forage$seg.id) 
@@ -246,7 +235,7 @@ set.seed(2)
 mod.forage_S<- gibbs_resist(ysoma = ysoma, xmat = xmat, seg.id = seg.id,
                              ngibbs = ngibbs, nburn = nburn, var.betas = var.betas,
                              w = w, MaxIter = MaxIter)
-# takes 12 min to run (for 5000 iter)
+# takes 7 min to run (for 5000 iter)
 
 
 
@@ -255,13 +244,18 @@ mod.forage_S<- gibbs_resist(ysoma = ysoma, xmat = xmat, seg.id = seg.id,
 
 ## Transit
 
-ind<- c("slope", "ndvi","t.ar","rain",
-        paste("spline", 1:ncol(spline.S.transit), sep = "."))
-# mat.S.transit<- model.matrix(~path.S.transit$lulc + 0)
-# colnames(mat.S.transit)<- c("Field", "Woods", "Water", "Road")
-# ref.transit.S<- which.max(colSums(mat.S.transit))
-# xmat<- data.matrix(cbind(1, mat.S.transit[,-ref.transit.S], path.S.transit[,ind]))
-xmat<- data.matrix(cbind(1, path.S.transit[,ind]))
+#remove infrequently used land cover classes
+table(path.S.transit$lulc)  #water (4) < 10 obs
+cond.S<- unique(path.S.transit[path.S.transit$lulc == 4, "seg.id"])
+path.S.transit<- path.S.transit[!(path.S.transit$seg.id %in% cond.S),]
+
+#Update factor levels of LULC to reflect removal of classes
+path.S.transit$lulc<- factor(as.character(path.S.transit$lulc))
+
+ind<- c("slope","t.ar","rain")
+mat.S.transit<- model.matrix(~path.S.transit$lulc + 0)
+colnames(mat.S.transit)<- c("Pasture","Forest","Road")
+xmat<- data.matrix(cbind(1, mat.S.transit[,-3], path.S.transit[,ind]))
 
 #reformat seg.id so it is consecutive and numeric
 path.S.transit$seg.id<- factor(path.S.transit$seg.id) 
@@ -278,7 +272,7 @@ cond=!is.na(path.S.transit$dt)
 ysoma=path.S.transit[cond,'dt']
 
 #model args
-ngibbs=5000
+ngibbs=2000
 nburn=ngibbs/2
 w=0.1
 MaxIter=10000
@@ -292,7 +286,7 @@ set.seed(2)
 mod.transit_S<- gibbs_resist(ysoma = ysoma, xmat = xmat, seg.id = seg.id,
                               ngibbs = ngibbs, nburn = nburn, var.betas = var.betas,
                               w = w, MaxIter = MaxIter)
-# takes 5 min to run (for 5000 iter)
+# takes 1.5 min to run (for 2000 iter)
 
 
 

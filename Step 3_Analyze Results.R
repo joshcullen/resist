@@ -9,8 +9,7 @@ library(raster)
 
 #look at betas (convert to data frame)
 store.betas_Nforage<- data.frame(mod.forage_N$betas[(nburn+1):ngibbs, ])
-names(store.betas_Nforage)<- c("int","slope", "ndvi","t.ar","rain",
-                               paste("spline", 1:ncol(spline.N.forage), sep = "."))
+names(store.betas_Nforage)<- c("int","pasture","cane","forest","slope","t.ar","rain")
 store.betas.long_Nforage<- tidyr::pivot_longer(store.betas_Nforage,
                                                cols = names(store.betas_Nforage),
                                                names_to = "betas")
@@ -53,8 +52,7 @@ ggplot(store.betas.long_Nforage %>% filter(betas != "int"),aes(y=betas, x=value,
 
 #look at betas (convert to data frame)
 store.betas_Ntransit<- data.frame(mod.transit_N$betas[(nburn+1):ngibbs, ])
-names(store.betas_Ntransit)<- c("int","slope", "ndvi","t.ar","rain",
-                                paste("spline", 1:ncol(spline.N.transit), sep = "."))
+names(store.betas_Ntransit)<- c("int","pasture","cane","forest","slope","t.ar","rain")
 store.betas.long_Ntransit<- tidyr::pivot_longer(store.betas_Ntransit,
                                                cols = names(store.betas_Ntransit),
                                                names_to = "betas")
@@ -217,15 +215,11 @@ betas.forage_N<- colMeans(store.betas_Nforage)
 #Need to center and scale raster values so comparable to beta coeffs
 
 #Load env raster data
-dist2rdN<- raster('dist2rd_N.tif')
 slopeN<- raster('slope_N.tif')
-ndviN<- raster('ndvi_N.tif')
-# lulcN<- raster('lulc_N.tif')
+lulcN<- raster('lulc_N.tif')
 
-covars.N<- brick(dist2rdN, slopeN, ndviN)
-covars.N$dist2rd_N<- scale(covars.N$dist2rd_N, center = T, scale = T)
+covars.N<- brick(lulcN, slopeN)
 covars.N$slope_N<- scale(covars.N$slope_N, center = T, scale = T)
-covars.N$ndvi_N<- scale(covars.N$ndvi_N, center = T, scale = T)
 
 # Mask all unused pixels
 ind_N<- unique(cellFromXY(slopeN, dat.N[, c("x","y")]))
@@ -250,39 +244,54 @@ scaled_rain_N<- path.N$rain %>%
 
 #Min recorded temperature
 resistSurfN.forage_minTemp<- exp(
-  betas.forage_N["int"] + 
+  ifelse(values(covars.N_masked$lulc_N) == 3, betas.forage_N["int"],
+         ifelse(values(covars.N_masked$lulc_N) == 1,
+                betas.forage_N["int"] + betas.forage_N["pasture"],
+                ifelse(values(covars.N_masked$lulc_N) == 5,
+                       betas.forage_N["int"] + betas.forage_N["cane"],
+                       ifelse(values(covars.N_masked$lulc_N) == 6,
+                              betas.forage_N["int"] + betas.forage_N["forest"],
+                              ifelse(!is.na(values(covars.N_masked$lulc_N)),
+                                     betas.forage_N["int"], NA))))) + 
   betas.forage_N["slope"]*covars.N_masked$slope_N + 
-  betas.forage_N["ndvi"]*covars.N_masked$ndvi_N + 
   betas.forage_N["t.ar"]*scaled_t.ar_N$min +  #for min temp
-  betas.forage_N["rain"]*scaled_rain_N$mean +  #for avg rainfall
-  betas.forage_N["spline.1"]*covars.N_masked$dist2rd_N +
-  betas.forage_N["spline.2"]*covars.N_masked$dist2rd_N
+  betas.forage_N["rain"]*scaled_rain_N$mean  #for avg rainfall
   )
 resistSurfN.forage_minTemp.df<- as.data.frame(resistSurfN.forage_minTemp, xy=T) %>% 
   mutate(temp.level = "Min")
 
 #Avg recorded temperature
 resistSurfN.forage_avgTemp<- exp(
-  betas.forage_N["int"] + 
+  ifelse(values(covars.N_masked$lulc_N) == 3, betas.forage_N["int"],
+         ifelse(values(covars.N_masked$lulc_N) == 1,
+                betas.forage_N["int"] + betas.forage_N["pasture"],
+                ifelse(values(covars.N_masked$lulc_N) == 5,
+                       betas.forage_N["int"] + betas.forage_N["cane"],
+                       ifelse(values(covars.N_masked$lulc_N) == 6,
+                              betas.forage_N["int"] + betas.forage_N["forest"],
+                              ifelse(!is.na(values(covars.N_masked$lulc_N)),
+                                     betas.forage_N["int"], NA))))) + 
     betas.forage_N["slope"]*covars.N_masked$slope_N + 
-    betas.forage_N["ndvi"]*covars.N_masked$ndvi_N + 
-    betas.forage_N["t.ar"]*scaled_t.ar_N$mean +  #for mean temp
-    betas.forage_N["rain"]*scaled_rain_N$mean +  #for avg rainfall
-    betas.forage_N["spline.1"]*covars.N_masked$dist2rd_N +
-    betas.forage_N["spline.2"]*covars.N_masked$dist2rd_N
+    betas.forage_N["t.ar"]*scaled_t.ar_N$mean +  #for avg temp
+    betas.forage_N["rain"]*scaled_rain_N$mean  #for avg rainfall
 )
 resistSurfN.forage_avgTemp.df<- as.data.frame(resistSurfN.forage_avgTemp, xy=T) %>% 
   mutate(temp.level = "Avg")
 
 #Max recorded temperature
 resistSurfN.forage_maxTemp<- exp(
-  betas.forage_N["int"] + 
+  ifelse(values(covars.N_masked$lulc_N) == 3, betas.forage_N["int"],
+         ifelse(values(covars.N_masked$lulc_N) == 1,
+                betas.forage_N["int"] + betas.forage_N["pasture"],
+                ifelse(values(covars.N_masked$lulc_N) == 5,
+                       betas.forage_N["int"] + betas.forage_N["cane"],
+                       ifelse(values(covars.N_masked$lulc_N) == 6,
+                              betas.forage_N["int"] + betas.forage_N["forest"],
+                              ifelse(!is.na(values(covars.N_masked$lulc_N)),
+                                     betas.forage_N["int"], NA))))) + 
     betas.forage_N["slope"]*covars.N_masked$slope_N + 
-    betas.forage_N["ndvi"]*covars.N_masked$ndvi_N + 
     betas.forage_N["t.ar"]*scaled_t.ar_N$max +  #for max temp
-    betas.forage_N["rain"]*scaled_rain_N$mean +  #for avg rainfall
-    betas.forage_N["spline.1"]*covars.N_masked$dist2rd_N +
-    betas.forage_N["spline.2"]*covars.N_masked$dist2rd_N
+    betas.forage_N["rain"]*scaled_rain_N$mean  #for avg rainfall
 )
 resistSurfN.forage_maxTemp.df<- as.data.frame(resistSurfN.forage_maxTemp, xy=T) %>% 
   mutate(temp.level = "Max")
@@ -298,7 +307,8 @@ resistSurfN.forage.df$temp.level<- factor(resistSurfN.forage.df$temp.level,
 
 ggplot() +
   geom_tile(data = resistSurfN.forage.df, aes(x, y, fill = layer)) +
-  scale_fill_viridis_c("Time Spent\nper Cell (min)", option = "inferno", na.value = "n") +
+  scale_fill_viridis_c("Time Spent\nper Cell (min)", option = "inferno",
+                       na.value = "transparent") +
   # geom_point(data = dat.N %>% filter(state == "Foraging"), aes(x, y, color = id),
   #            size = 0.5, alpha = 0.2, show.legend = F) +
   scale_x_continuous(expand = c(0,0)) +
@@ -329,45 +339,54 @@ betas.transit_N<- colMeans(store.betas_Ntransit)
 
 #Min recorded temperature
 resistSurfN.transit_minTemp<- exp(
-  betas.transit_N["int"] + 
+  ifelse(values(covars.N_masked$lulc_N) == 3, betas.transit_N["int"],
+         ifelse(values(covars.N_masked$lulc_N) == 1,
+                betas.transit_N["int"] + betas.transit_N["pasture"],
+                ifelse(values(covars.N_masked$lulc_N) == 5,
+                       betas.transit_N["int"] + betas.transit_N["cane"],
+                       ifelse(values(covars.N_masked$lulc_N) == 6,
+                              betas.transit_N["int"] + betas.transit_N["forest"],
+                              ifelse(!is.na(values(covars.N_masked$lulc_N)),
+                                     betas.transit_N["int"], NA))))) + 
     betas.transit_N["slope"]*covars.N_masked$slope_N + 
-    betas.transit_N["ndvi"]*covars.N_masked$ndvi_N + 
     betas.transit_N["t.ar"]*scaled_t.ar_N$min +  #for min temp
-    betas.transit_N["rain"]*scaled_rain_N$mean +  #for avg rainfall
-    betas.transit_N["spline.1"]*covars.N_masked$dist2rd_N +
-    betas.transit_N["spline.2"]*covars.N_masked$dist2rd_N +
-    betas.transit_N["spline.3"]*covars.N_masked$dist2rd_N +
-    betas.transit_N["spline.4"]*covars.N_masked$dist2rd_N
+    betas.transit_N["rain"]*scaled_rain_N$mean  #for avg rainfall
 )
 resistSurfN.transit_minTemp.df<- as.data.frame(resistSurfN.transit_minTemp, xy=T) %>% 
   mutate(temp.level = "Min")
 
 #Avg recorded temperature
 resistSurfN.transit_avgTemp<- exp(
-  betas.transit_N["int"] + 
+  ifelse(values(covars.N_masked$lulc_N) == 3, betas.transit_N["int"],
+         ifelse(values(covars.N_masked$lulc_N) == 1,
+                betas.transit_N["int"] + betas.transit_N["pasture"],
+                ifelse(values(covars.N_masked$lulc_N) == 5,
+                       betas.transit_N["int"] + betas.transit_N["cane"],
+                       ifelse(values(covars.N_masked$lulc_N) == 6,
+                              betas.transit_N["int"] + betas.transit_N["forest"],
+                              ifelse(!is.na(values(covars.N_masked$lulc_N)),
+                                     betas.transit_N["int"], NA))))) + 
     betas.transit_N["slope"]*covars.N_masked$slope_N + 
-    betas.transit_N["ndvi"]*covars.N_masked$ndvi_N + 
     betas.transit_N["t.ar"]*scaled_t.ar_N$mean +  #for avg temp
-    betas.transit_N["rain"]*scaled_rain_N$mean +  #for avg rainfall
-    betas.transit_N["spline.1"]*covars.N_masked$dist2rd_N +
-    betas.transit_N["spline.2"]*covars.N_masked$dist2rd_N +
-    betas.transit_N["spline.3"]*covars.N_masked$dist2rd_N +
-    betas.transit_N["spline.4"]*covars.N_masked$dist2rd_N
+    betas.transit_N["rain"]*scaled_rain_N$mean  #for avg rainfall
 )
 resistSurfN.transit_avgTemp.df<- as.data.frame(resistSurfN.transit_avgTemp, xy=T) %>% 
   mutate(temp.level = "Avg")
 
 #Max recorded temperature
 resistSurfN.transit_maxTemp<- exp(
-  betas.transit_N["int"] + 
+  ifelse(values(covars.N_masked$lulc_N) == 3, betas.transit_N["int"],
+         ifelse(values(covars.N_masked$lulc_N) == 1,
+                betas.transit_N["int"] + betas.transit_N["pasture"],
+                ifelse(values(covars.N_masked$lulc_N) == 5,
+                       betas.transit_N["int"] + betas.transit_N["cane"],
+                       ifelse(values(covars.N_masked$lulc_N) == 6,
+                              betas.transit_N["int"] + betas.transit_N["forest"],
+                              ifelse(!is.na(values(covars.N_masked$lulc_N)),
+                                     betas.transit_N["int"], NA))))) + 
     betas.transit_N["slope"]*covars.N_masked$slope_N + 
-    betas.transit_N["ndvi"]*covars.N_masked$ndvi_N + 
     betas.transit_N["t.ar"]*scaled_t.ar_N$max +  #for max temp
-    betas.transit_N["rain"]*scaled_rain_N$mean +  #for avg rainfall
-    betas.transit_N["spline.1"]*covars.N_masked$dist2rd_N +
-    betas.transit_N["spline.2"]*covars.N_masked$dist2rd_N +
-    betas.transit_N["spline.3"]*covars.N_masked$dist2rd_N +
-    betas.transit_N["spline.4"]*covars.N_masked$dist2rd_N
+    betas.transit_N["rain"]*scaled_rain_N$mean  #for avg rainfall
 )
 resistSurfN.transit_maxTemp.df<- as.data.frame(resistSurfN.transit_maxTemp, xy=T) %>% 
   mutate(temp.level = "Max")
@@ -383,7 +402,8 @@ resistSurfN.transit.df$temp.level<- factor(resistSurfN.transit.df$temp.level,
 
 ggplot() +
   geom_tile(data = resistSurfN.transit.df, aes(x, y, fill = layer)) +
-  scale_fill_viridis_c("Time Spent\nper Cell (min)", option = "inferno", na.value = "n") +
+  scale_fill_viridis_c("Time Spent\nper Cell (min)", option = "inferno",
+                       na.value = "transparent") +
   # geom_point(data = dat.N %>% filter(state == "Transit"), aes(x, y, color = id),
   #            size = 0.5, alpha = 0.2, show.legend = F) +
   scale_x_continuous(expand = c(0,0)) +
