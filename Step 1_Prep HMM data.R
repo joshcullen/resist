@@ -55,7 +55,7 @@ plot(classes_DL_padrao.tif)
 plot(classes_ST.tif)
 
 
-#Simplify LU/LC values of Southern site to 5 instead of 7 values  (change all to )
+#Simplify LU/LC values of Southern site to 5 instead of 7 values  (change all to Mata)
 classes_ST.tif[classes_ST.tif == 2] <- 3
 classes_ST.tif[classes_ST.tif == 6] <- 3
 
