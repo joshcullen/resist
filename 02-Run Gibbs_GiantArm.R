@@ -30,12 +30,12 @@ path<- path[path$seg.id %in% cond,]
 
 # Center and Scale covariate
 path.s<- path %>% 
-  mutate_at(c("ndvi"),
-            ~scale(., center = TRUE, scale = TRUE)) %>% 
+  mutate_at(c("ndvi","awei"),
+            ~scale(., center = TRUE, scale = TRUE)) %>%
   drop_na(ndvi)
 
 
-ind<- "ndvi"
+ind<- c("ndvi", "awei")
 xmat<- data.matrix(cbind(1, path.s[,ind]))
 
 
@@ -75,7 +75,7 @@ set.seed(123)
 mod<- gibbs_resist(ysoma = ysoma, xmat = xmat, seg.id = seg.id,
                             ngibbs = ngibbs, nburn = nburn, var.betas = var.betas,
                             w = w, MaxIter = MaxIter)
-# takes 3 min to run (for 2000 iter)
+# takes 1 min to run (for 2000 iter)
 
 
 

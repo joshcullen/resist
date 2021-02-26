@@ -2,10 +2,11 @@
 
 library(ggridges)
 library(raster)
+library(lubridate)
 
 #look at betas (convert to data frame)
 store.betas<- data.frame(mod$betas[(nburn+1):ngibbs, ])
-names(store.betas)<- c("int","ndvi")
+names(store.betas)<- c("int","ndvi","awei")
 store.betas.long<- tidyr::pivot_longer(store.betas,
                                                cols = names(store.betas),
                                                names_to = "betas")
@@ -69,23 +70,33 @@ ndvi<- crop(ndvi, extent(dat %>%
 
 ndvi.s<- scale(ndvi, center = T, scale = T)
 
+
+## AWEI
+
+awei<- brick('GiantArm_awei_season.grd')
+awei<- crop(awei, ndvi)
+awei.s<- scale(awei, center = T, scale = T)
+
+
 # Mask all unused pixels
-ind<- unique(cellFromXY(ndvi.s, dat[, c("x","y")]))
-ndvi.s_masked<- ndvi.s
-ndvi.s_masked[setdiff(1:ncell(ndvi.s_masked), ind_N)] <- NA
+# ind<- unique(cellFromXY(ndvi.s, dat[, c("x","y")]))
+# ndvi.s_masked<- ndvi.s
+# ndvi.s_masked[setdiff(1:ncell(ndvi.s_masked), ind_N)] <- NA
 
 
 ##Perform raster math using beta coeffs
 resistSurf_flood<- exp(
     betas["int"] + 
-    betas["ndvi"]*ndvi.s$Flood  #for Flood
+    betas["ndvi"]*ndvi.s$Flood +  #for Flood
+    betas["awei"]*awei.s$Flood  #for Flood
 )
 resistSurf_flood.df<- as.data.frame(resistSurf_flood, xy=T) %>% 
   mutate(season = "Flood")
 
 resistSurf_dry<- exp(
   betas["int"] + 
-    betas["ndvi"]*ndvi.s$Dry  #for Dry
+    betas["ndvi"]*ndvi.s$Dry +  #for Dry
+    betas["awei"]*awei.s$Dry  #for Dry
 )
 resistSurf_dry.df<- as.data.frame(resistSurf_dry, xy=T) %>% 
   mutate(season = "Dry")

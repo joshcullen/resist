@@ -7,6 +7,7 @@ library(lubridate)
 library(sp)
 library(furrr)
 library(future)
+library(progressr)
 
 source('helper functions.R')
 
@@ -26,6 +27,7 @@ dat<-  dat %>%
 dat$month<- month.abb[month(dat$date)]
 dat$month<- factor(dat$month, levels = month.abb[c(5:12,1)])
 dat$season<- ifelse(dat$month %in% month.abb[1:7], "Flood", "Dry")
+dat$season<- factor(dat$season, levels = c("Flood","Dry"))
 
 
 
@@ -46,22 +48,27 @@ ndvi<- crop(ndvi, extent(dat %>%
                                            ymax = max(y) + 3000) %>% 
                                  unlist()))
 
+## AWEI
 
+awei<- brick('GiantArm_awei_season.grd')
+awei<- crop(awei, ndvi)
+
+
+covars<- stack(ndvi, awei)
 
 
 #######################################################
 ### Extract values from raster layer for each track ###
 #######################################################
 plan(multisession)
-path<- extract.covars(data = dat, layers = ndvi, state.col = "z.post.thresh")
+
+# progressr::with_progress({  #to print progress bar
+  path<- extract.covars(data = dat, layers = covars, state.col = "z.post.thresh",
+                        dyn_names = c("ndvi","awei"), ind = "season")
+# })
 #takes 2 min to run
 
 future:::ClusterRegistry("stop")  #close all threads and memory used
-
-
-path$ndvi<- ifelse(month(path$date) %in% 1:7, path$Flood, path$Dry)
-path<- path %>% 
-  dplyr::select(-c(Flood, Dry))
 
 
 
@@ -72,4 +79,4 @@ path<- path %>%
 setwd("~/Documents/Snail Kite Project/Data/R Scripts/ValleLabUF/resist")
 
 # Armadillo Data
-write.csv(path, "Giant Armadillo Resistance Data.csv", row.names = F)
+# write.csv(path, "Giant Armadillo Resistance Data.csv", row.names = F)
