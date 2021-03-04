@@ -2,6 +2,7 @@ library(Rcpp)
 library(mvtnorm)
 library(dplyr)
 library(ggplot2)
+library(lubridate)
 library(tidyr)
 library(tictoc)
 
@@ -16,7 +17,7 @@ sourceCpp('resist_aux.cpp')
 ### Import armadillo data ###
 #############################
 
-path<- read.csv("Giant Armadillo Resistance Data.csv", as.is = T)
+path<- read.csv("Emanuel Resistance Data.csv", as.is = T)
 path$dt<- path$dt/60  #convert to min from sec
 
 
@@ -29,15 +30,20 @@ path<- path[path$seg.id %in% cond,]
 ### Reformat Data ###
 
 # Center and Scale covariate
-path.s<- path %>% 
-  mutate_at(c("ndvi","awei"),
-            ~scale(., center = TRUE, scale = TRUE)) %>%
-  drop_na(ndvi)
+# path.s<- path %>% 
+#   mutate_at(c("ndvi","awei"),
+#             ~scale(., center = TRUE, scale = TRUE)) %>%
+#   drop_na(ndvi)
+path.s<- path
+path.s$month<- month.abb[month(path.s$date)]
+path.s$month<- factor(path.s$month, levels = month.abb[c(5:12,1)])
 
+ind<- c("evi")
 
-ind<- c("ndvi", "awei")
-xmat<- data.matrix(cbind(1, path.s[,ind]))
+month.dumm<- model.matrix(~path.s$month + 0)
+month.dumm<- month.dumm[,which(colSums(month.dumm) > 0)]
 
+xmat<- data.matrix(cbind(1, month.dumm[,-1], path.s[,ind]))  #treat May as ref
 
 
 #reformat seg.id so it is consecutive and numeric
@@ -61,7 +67,7 @@ ysoma=path.s[cond,'dt']
 #################
 
 #model args
-ngibbs=2000
+ngibbs=10000
 nburn=ngibbs/2
 w=0.1
 MaxIter=10000
@@ -75,7 +81,7 @@ set.seed(123)
 mod<- gibbs_resist(ysoma = ysoma, xmat = xmat, seg.id = seg.id,
                             ngibbs = ngibbs, nburn = nburn, var.betas = var.betas,
                             w = w, MaxIter = MaxIter)
-# takes 1 min to run (for 2000 iter)
+# takes 3 min to run (for 10000 iter)
 
 
 
@@ -91,7 +97,6 @@ store.betas<- mod$betas
 
 #look at overall convergence
 plot(store.llk, type='l')
-abline(v=nburn, col='red')
 plot(store.llk[(nburn + 1):ngibbs], type='l')
 acf(store.llk[(nburn + 1):ngibbs])
 

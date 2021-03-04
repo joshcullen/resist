@@ -38,23 +38,25 @@ dat$season<- factor(dat$season, levels = c("Flood","Dry"))
 
 setwd("~/Documents/Snail Kite Project/Data/R Scripts/ValleLabUF/resist_avg")
 
-## NDVI
+## EVI
 
-ndvi<- brick('GiantArm_ndvi_season.grd')
-ndvi<- crop(ndvi, extent(dat %>% 
+evi<- brick('GiantArm_evi_monthly.grd')
+evi<- crop(evi, extent(dat %>% 
                                  summarize(xmin = min(x) - 3000,
                                            xmax = max(x) + 3000,
                                            ymin = min(y) - 3000,
                                            ymax = max(y) + 3000) %>% 
                                  unlist()))
+evi.s<- scale(evi)
 
-## AWEI
+## NDWI
 
-awei<- brick('GiantArm_awei_season.grd')
-awei<- crop(awei, ndvi)
+ndwi<- brick('GiantArm_ndwi_monthly.grd')
+ndwi<- crop(ndwi, evi)
+ndwi.s<- scale(ndwi)
 
 
-covars<- stack(ndvi, awei)
+covars<- stack(evi.s, ndwi.s)
 
 
 #######################################################
@@ -62,11 +64,14 @@ covars<- stack(ndvi, awei)
 #######################################################
 plan(multisession)
 
+dat.em<- dat %>% 
+  filter(id == "emanuel")
+
 # progressr::with_progress({  #to print progress bar
-  path<- extract.covars(data = dat, layers = covars, state.col = "z.post.thresh",
-                        dyn_names = c("ndvi","awei"), ind = "season")
+  path<- extract.covars(data = dat.em, layers = evi.s, state.col = "z.post.thresh",
+                        dyn_names = "evi", ind = "month")
 # })
-#takes 2 min to run
+#takes 54 s to run
 
 future:::ClusterRegistry("stop")  #close all threads and memory used
 
@@ -79,4 +84,4 @@ future:::ClusterRegistry("stop")  #close all threads and memory used
 setwd("~/Documents/Snail Kite Project/Data/R Scripts/ValleLabUF/resist")
 
 # Armadillo Data
-# write.csv(path, "Giant Armadillo Resistance Data.csv", row.names = F)
+# write.csv(path, "Emanuel Resistance Data.csv", row.names = F)

@@ -6,7 +6,7 @@ library(lubridate)
 
 #look at betas (convert to data frame)
 store.betas<- data.frame(mod$betas[(nburn+1):ngibbs, ])
-names(store.betas)<- c("int","ndvi","awei")
+names(store.betas)<- c("int","Jun","Sep","Oct","Nov","evi")
 store.betas.long<- tidyr::pivot_longer(store.betas,
                                                cols = names(store.betas),
                                                names_to = "betas")
@@ -51,6 +51,8 @@ dat$month<- month.abb[month(dat$date)]
 dat$month<- factor(dat$month, levels = month.abb[c(5:12,1)])
 dat$season<- ifelse(dat$month %in% month.abb[1:7], "Flood", "Dry")
 
+dat.em<-  dat %>% 
+  filter(id == "emanuel")
 
 #extract beta coeffs (mean)
 betas<- colMeans(store.betas)
@@ -60,22 +62,24 @@ betas<- colMeans(store.betas)
 #Load env raster data
 ## NDVI
 setwd("~/Documents/Snail Kite Project/Data/R Scripts/ValleLabUF/resist_avg")
-ndvi<- brick('GiantArm_ndvi_season.grd')
-ndvi<- crop(ndvi, extent(dat %>% 
+evi<- brick('GiantArm_evi_monthly.grd')
+evi.s<- scale(evi, center = T, scale = T)
+
+evi.s<- crop(evi.s, extent(dat.em %>% 
                            summarize(xmin = min(x) - 3000,
                                      xmax = max(x) + 3000,
                                      ymin = min(y) - 3000,
                                      ymax = max(y) + 3000) %>% 
                            unlist()))
 
-ndvi.s<- scale(ndvi, center = T, scale = T)
 
 
-## AWEI
 
-awei<- brick('GiantArm_awei_season.grd')
-awei<- crop(awei, ndvi)
-awei.s<- scale(awei, center = T, scale = T)
+## NDWI
+
+ndwi<- brick('GiantArm_ndwi_monthly.grd')
+ndwi<- crop(ndwi, ndvi)
+ndwi.s<- scale(ndwi, center = T, scale = T)
 
 
 # Mask all unused pixels
@@ -85,36 +89,49 @@ awei.s<- scale(awei, center = T, scale = T)
 
 
 ##Perform raster math using beta coeffs
-resistSurf_flood<- exp(
-    betas["int"] + 
-    betas["ndvi"]*ndvi.s$Flood +  #for Flood
-    betas["awei"]*awei.s$Flood  #for Flood
-)
-resistSurf_flood.df<- as.data.frame(resistSurf_flood, xy=T) %>% 
-  mutate(season = "Flood")
+resistSurf<- list()
+evi.s2<- evi.s[[which(names(evi.s) %in% unique(path.s$month))]]
 
-resistSurf_dry<- exp(
-  betas["int"] + 
-    betas["ndvi"]*ndvi.s$Dry +  #for Dry
-    betas["awei"]*awei.s$Dry  #for Dry
-)
-resistSurf_dry.df<- as.data.frame(resistSurf_dry, xy=T) %>% 
-  mutate(season = "Dry")
+#adjust month-based intercepts
+betas2<- betas
+betas2[2:5]<- betas2[1] + betas2[2:5]
+
+for (i in 1:length(unique(path.s$month))) {
+  resistSurf[[i]]<- exp(
+    betas2[i] + 
+      betas2["evi"]*evi.s2[[i]]
+  )
+}
+resistSurf<- stack(resistSurf)
+names(resistSurf)<- names(evi.s2)
+
+resistSurf.df<- as.data.frame(resistSurf, xy=T) %>% 
+  pivot_longer(cols = -c(x,y), names_to = "month", values_to = "time")
+  # mutate(month = rep(month.abb[c(5:12,1)], each = ncell(ndwi$May)))
+resistSurf.df$month<- factor(resistSurf.df$month, levels = names(evi.s2))
+
+# resistSurf_dry<- exp(
+#   betas["int"] + 
+#     betas["ndvi"]*ndvi.s$Dry +  #for Dry
+#     betas["awei"]*awei.s$Dry  #for Dry
+# )
+# resistSurf_dry.df<- as.data.frame(resistSurf_dry, xy=T) %>% 
+#   mutate(season = "Dry")
 
 
 
 
 #Combine all results together for each season
-resistSurf.df<- rbind(resistSurf_flood.df, resistSurf_dry.df)
+# resistSurf.df<- rbind(resistSurf_flood.df, resistSurf_dry.df)
 
 
 ## Map predictive surfaces
 ggplot() +
-  geom_tile(data = resistSurf.df, aes(x, y, fill = layer)) +
+  geom_tile(data = resistSurf.df, aes(x, y, fill = time)) +
   scale_fill_viridis_c("Time Spent\nper Cell (min)", option = "inferno",
-                       na.value = "transparent") +
-  # geom_point(data = dat.N %>% filter(state == "Foraging"), aes(x, y, color = id),
-  #            size = 0.5, alpha = 0.2, show.legend = F) +
+                       na.value = "transparent", limits = c(0,4)) +
+  geom_point(data = dat.em, aes(x, y),
+             size = 0.5, alpha = 0.5, show.legend = F, color = "red") +
   scale_x_continuous(expand = c(0,0)) +
   scale_y_continuous(expand = c(0,0)) +
   labs(x="Easting", y="Northing") +
@@ -128,4 +145,4 @@ ggplot() +
         legend.title = element_text(size = 14),
         legend.text = element_text(size = 12)) +
   guides(fill = guide_colourbar(barwidth = 30, barheight = 1)) +
-  facet_wrap(~ season)
+  facet_wrap(~ month)
