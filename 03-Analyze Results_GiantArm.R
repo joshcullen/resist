@@ -6,7 +6,7 @@ library(lubridate)
 
 #look at betas (convert to data frame)
 store.betas<- data.frame(mod$betas[(nburn+1):ngibbs, ])
-names(store.betas)<- c("int","Jun","Sep","Oct","Nov","evi")
+names(store.betas)<- c("Jun","Sep","Oct","Nov",paste("spline", 1:ncol(spline.evi), sep = "."))
 store.betas.long<- tidyr::pivot_longer(store.betas,
                                                cols = names(store.betas),
                                                names_to = "betas")
@@ -60,7 +60,7 @@ betas<- colMeans(store.betas)
 #Need to center and scale raster values so comparable to beta coeffs
 
 #Load env raster data
-## NDVI
+## EVI
 setwd("~/Documents/Snail Kite Project/Data/R Scripts/ValleLabUF/resist_avg")
 evi<- brick('GiantArm_evi_monthly.grd')
 evi.s<- scale(evi, center = T, scale = T)
@@ -75,32 +75,22 @@ evi.s<- crop(evi.s, extent(dat.em %>%
 
 
 
-## NDWI
-
-ndwi<- brick('GiantArm_ndwi_monthly.grd')
-ndwi<- crop(ndwi, ndvi)
-ndwi.s<- scale(ndwi, center = T, scale = T)
-
-
-# Mask all unused pixels
-# ind<- unique(cellFromXY(ndvi.s, dat[, c("x","y")]))
-# ndvi.s_masked<- ndvi.s
-# ndvi.s_masked[setdiff(1:ncell(ndvi.s_masked), ind_N)] <- NA
-
-
 ##Perform raster math using beta coeffs
 resistSurf<- list()
 evi.s2<- evi.s[[which(names(evi.s) %in% unique(path.s$month))]]
 
 #adjust month-based intercepts
-betas2<- betas
-betas2[2:5]<- betas2[1] + betas2[2:5]
+# betas2<- betas
+# betas2[2:5]<- betas2[1] + betas2[2:5]
 
 for (i in 1:length(unique(path.s$month))) {
   resistSurf[[i]]<- exp(
-    betas2[i] + 
-      betas2["evi"]*evi.s2[[i]]
-  )
+    ifelse(i == 1, 0, betas[i-1]) + 
+    betas["spline.1"]*evi.s2[[i]] +
+    betas["spline.2"]*evi.s2[[i]] +
+    betas["spline.3"]*evi.s2[[i]] +
+    betas["spline.4"]*evi.s2[[i]]
+    )
 }
 resistSurf<- stack(resistSurf)
 names(resistSurf)<- names(evi.s2)
@@ -129,9 +119,9 @@ resistSurf.df$month<- factor(resistSurf.df$month, levels = names(evi.s2))
 ggplot() +
   geom_tile(data = resistSurf.df, aes(x, y, fill = time)) +
   scale_fill_viridis_c("Time Spent\nper Cell (min)", option = "inferno",
-                       na.value = "transparent", limits = c(0,4)) +
+                       na.value = "transparent", limits = c(0,10)) +
   geom_point(data = dat.em, aes(x, y),
-             size = 0.5, alpha = 0.5, show.legend = F, color = "red") +
+             size = 0.5, alpha = 0.5, show.legend = F, color = "chartreuse") +
   scale_x_continuous(expand = c(0,0)) +
   scale_y_continuous(expand = c(0,0)) +
   labs(x="Easting", y="Northing") +

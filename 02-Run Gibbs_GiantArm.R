@@ -5,6 +5,7 @@ library(ggplot2)
 library(lubridate)
 library(tidyr)
 library(tictoc)
+library(splines)
 
 source('gibbs_resist.R')
 source('gibbs_resist_func.R')
@@ -38,12 +39,23 @@ path.s<- path
 path.s$month<- month.abb[month(path.s$date)]
 path.s$month<- factor(path.s$month, levels = month.abb[c(5:12,1)])
 
-ind<- c("evi")
+
+# Add B-spline (w/ 2 internal knots) for 'EVI'
+rango<- range(path.s$evi)
+knot.locs<- seq(rango[1], rango[2], length.out = 4)[2:3]
+spline.evi<- as.data.frame(bs(path.s$evi, degree=2, intercept = FALSE,
+                                   knots = knot.locs))
+names(spline.evi)<- paste("spline", 1:ncol(spline.evi), sep = ".")
+path.s<- cbind(path.s, spline.evi)
+
+
+ind<- c(paste("spline", 1:ncol(spline.evi), sep = "."))
+
 
 month.dumm<- model.matrix(~path.s$month + 0)
-month.dumm<- month.dumm[,which(colSums(month.dumm) > 0)]
+month.dumm<- month.dumm[,which(colSums(month.dumm) > 0)]  #remove months w/o observations
 
-xmat<- data.matrix(cbind(1, month.dumm[,-1], path.s[,ind]))  #treat May as ref
+xmat<- data.matrix(cbind(month.dumm[,-1], path.s[,ind]))  #treat May as ref
 
 
 #reformat seg.id so it is consecutive and numeric
@@ -81,7 +93,7 @@ set.seed(123)
 mod<- gibbs_resist(ysoma = ysoma, xmat = xmat, seg.id = seg.id,
                             ngibbs = ngibbs, nburn = nburn, var.betas = var.betas,
                             w = w, MaxIter = MaxIter)
-# takes 3 min to run (for 10000 iter)
+# takes 5 min to run (for 10000 iter)
 
 
 
