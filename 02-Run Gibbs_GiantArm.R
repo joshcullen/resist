@@ -56,7 +56,7 @@ month.dumm<- model.matrix(~path.s$month + 0)
 month.dumm<- month.dumm[,which(colSums(month.dumm) > 0)]  #remove months w/o observations
 
 xmat<- data.matrix(cbind(month.dumm[,-1], path.s[,ind]))  #treat May as ref
-
+colnames(xmat)[1:4]<- c("Jun","Sep","Oct","Nov")
 
 #reformat seg.id so it is consecutive and numeric
 path.s$seg.id<- factor(path.s$seg.id) 
@@ -85,7 +85,7 @@ w=0.1
 MaxIter=10000
 
 #priors
-var.betas=rep(10,ncol(xmat)) #changed
+var.betas=rep(10,ncol(xmat)) 
 
 
 #Run model
@@ -129,3 +129,15 @@ for (i in 1:nbetas){
 par(mfrow=c(1,1),mar=rep(3,4))
 
 ## Traceplots all indicate that convergence has been reached
+
+
+
+############################
+### Export model results ###
+############################
+res<- cbind(store.b, store.betas)
+res<- data.frame(res) %>% 
+  slice((nburn + 1):ngibbs)
+names(res)<- c("gamma.b", colnames(xmat))
+
+write.csv(res, "Giant Armadillo Resistance Results.csv", row.names = F)

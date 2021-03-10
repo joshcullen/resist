@@ -1,17 +1,18 @@
 ### Visualize Results from Best Models ###
 
+library(tidyverse)
 library(ggridges)
 library(raster)
 library(lubridate)
 
-#look at betas (convert to data frame)
-store.betas<- data.frame(mod$betas[(nburn+1):ngibbs, ])
-names(store.betas)<- c("Jun","Sep","Oct","Nov",paste("spline", 1:ncol(spline.evi), sep = "."))
+betas<- read.csv("Giant Armadillo Resistance Results.csv", as.is = T)
+
+#look only at betas
+store.betas<- betas[,2:9]
 store.betas.long<- tidyr::pivot_longer(store.betas,
                                                cols = names(store.betas),
                                                names_to = "betas")
-store.betas.long$betas<- factor(store.betas.long$betas,
-                                        levels = names(store.betas))
+store.betas.long$betas<- factor(store.betas.long$betas, levels = names(store.betas))
 
 ggplot(store.betas.long, aes(x=betas, y=value)) +
   geom_boxplot(color="firebrick") +
