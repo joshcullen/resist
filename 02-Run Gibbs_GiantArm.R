@@ -140,4 +140,4 @@ res<- data.frame(res) %>%
   slice((nburn + 1):ngibbs)
 names(res)<- c("gamma.b", colnames(xmat))
 
-write.csv(res, "Giant Armadillo Resistance Results.csv", row.names = F)
+# write.csv(res, "Giant Armadillo Resistance Results.csv", row.names = F)

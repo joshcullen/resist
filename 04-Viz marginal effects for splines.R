@@ -1,3 +1,4 @@
+
 library(tidyverse)
 library(lubridate)
 library(splines)
@@ -10,7 +11,8 @@ library(ggExtra)
 
 path<- read.csv("Emanuel Resistance Data.csv", as.is = T)
 path$dt<- path$dt/60  #convert to min from sec
-
+path$month<- month.abb[month(path$date)]
+path$month<- factor(path$month, levels = month.abb[c(5:12,1)])
 
 # Filter data for only steps with 6 >= dt >= 8 min
 cond<- path[path$dt >= 6 & path$dt <= 8 & !is.na(path$dt), "seg.id"]
@@ -23,7 +25,7 @@ store.betas<- store.betas[,2:9]
 
 
 ## EVI
-#Generate sequence along green
+#Generate sequence along EVI
 rango1<- range(path$evi)
 seq.evi<- seq(rango1[1], rango1[2], length.out = 100)
 

@@ -4,11 +4,24 @@ library(tidyverse)
 library(ggridges)
 library(raster)
 library(lubridate)
+library(splines)
 
-betas<- read.csv("Giant Armadillo Resistance Results.csv", as.is = T)
+
+### Load data ###
+
+path<- read.csv("Emanuel Resistance Data.csv", as.is = T)
+path$dt<- path$dt/60  #convert to min from sec
+path$month<- month.abb[month(path$date)]
+path$month<- factor(path$month, levels = month.abb[c(5:12,1)])
+
+# Filter data for only steps with 6 >= dt >= 8 min
+cond<- path[path$dt >= 6 & path$dt <= 8 & !is.na(path$dt), "seg.id"]
+path<- path[path$seg.id %in% cond,]
+
+store.betas<- read.csv("Giant Armadillo Resistance Results.csv", as.is = T)
 
 #look only at betas
-store.betas<- betas[,2:9]
+store.betas<- store.betas[,2:9]
 store.betas.long<- tidyr::pivot_longer(store.betas,
                                                cols = names(store.betas),
                                                names_to = "betas")
@@ -36,13 +49,13 @@ ggplot(store.betas.long, aes(y=betas, x=value, fill = betas)) +
 
 
 
-#### Create Predictive Surfaces (ndvi) ####
+#### Create Predictive Surfaces (EVI) ####
 
 #Load data to plot tracks
 setwd("~/Documents/Snail Kite Project/Data/R Scripts/acceleration")
 dat<- read.csv('Giant Armadillo state estimates.csv', as.is = T)
 dat$date<- as_datetime(dat$date, tz = "UTC")
-dat<-  dat %>% 
+dat<- dat %>% 
   rename(x = easting, y = northing) %>% 
   mutate(across(c('z.map','z.post.thresh','z.post.max'), factor,
                 levels = c("Slow-Turn","Slow-Unif","Exploratory","Transit","Unclassified"))
@@ -50,7 +63,7 @@ dat<-  dat %>%
 
 dat$month<- month.abb[month(dat$date)]
 dat$month<- factor(dat$month, levels = month.abb[c(5:12,1)])
-dat$season<- ifelse(dat$month %in% month.abb[1:7], "Flood", "Dry")
+# dat$season<- ifelse(dat$month %in% month.abb[1:7], "Flood", "Dry")
 
 dat.em<-  dat %>% 
   filter(id == "emanuel")
@@ -64,63 +77,52 @@ betas<- colMeans(store.betas)
 ## EVI
 setwd("~/Documents/Snail Kite Project/Data/R Scripts/ValleLabUF/resist_avg")
 evi<- brick('GiantArm_evi_monthly.grd')
-evi.s<- scale(evi, center = T, scale = T)
-
+evi<- crop(evi, extent(dat %>% 
+                         summarize(xmin = min(x) - 3000,
+                                   xmax = max(x) + 3000,
+                                   ymin = min(y) - 3000,
+                                   ymax = max(y) + 3000) %>% 
+                         unlist()))
+evi[getValues(evi) > 1 | getValues(evi) < -1]<- NA  #mask pixels where values are outside of accepted range
+evi.s<- scale(evi)
 evi.s<- crop(evi.s, extent(dat.em %>% 
                            summarize(xmin = min(x) - 3000,
                                      xmax = max(x) + 3000,
                                      ymin = min(y) - 3000,
                                      ymax = max(y) + 3000) %>% 
                            unlist()))
-
-
+# evi.s[getValues(evi.s) > max(path$evi) | getValues(evi.s) < min(path$evi)]<- NA  #mask pixels where values are outside of accepted range
 
 
 ##Perform raster math using beta coeffs
-resistSurf<- list()
-evi.s2<- evi.s[[which(names(evi.s) %in% unique(path.s$month))]]
+evi.s2<- evi.s[[which(names(evi.s) %in% unique(dat.em$month))]]
 
-#adjust month-based intercepts
-# betas2<- betas
-# betas2[2:5]<- betas2[1] + betas2[2:5]
+#Run splines on standardized sequence
+rango1<- range(path$evi)
+knot.locs<- seq(rango1[1], rango1[2], length.out = 4)[2:3]
+spline.evi<- bs(values(evi.s2), degree=2, intercept = FALSE, knots = knot.locs)
 
-for (i in 1:length(unique(path.s$month))) {
-  resistSurf[[i]]<- exp(
-    ifelse(i == 1, 0, betas[i-1]) + 
-    betas["spline.1"]*evi.s2[[i]] +
-    betas["spline.2"]*evi.s2[[i]] +
-    betas["spline.3"]*evi.s2[[i]] +
-    betas["spline.4"]*evi.s2[[i]]
-    )
-}
-resistSurf<- stack(resistSurf)
-names(resistSurf)<- names(evi.s2)
+month.dumm<- factor(rep(unique(dat.em$month), each = ncell(evi.s2)), levels = unique(dat.em$month))
+month.dumm<- model.matrix(~month.dumm + 0)
+design.mat<- cbind(month.dumm[,-1], spline.evi)
+
+resistVals<- as.vector(exp(design.mat %*% betas))
+
+resistSurf<- evi.s2
+values(resistSurf)<- resistVals
+
 
 resistSurf.df<- as.data.frame(resistSurf, xy=T) %>% 
   pivot_longer(cols = -c(x,y), names_to = "month", values_to = "time")
-  # mutate(month = rep(month.abb[c(5:12,1)], each = ncell(ndwi$May)))
 resistSurf.df$month<- factor(resistSurf.df$month, levels = names(evi.s2))
 
-# resistSurf_dry<- exp(
-#   betas["int"] + 
-#     betas["ndvi"]*ndvi.s$Dry +  #for Dry
-#     betas["awei"]*awei.s$Dry  #for Dry
-# )
-# resistSurf_dry.df<- as.data.frame(resistSurf_dry, xy=T) %>% 
-#   mutate(season = "Dry")
-
-
-
-
-#Combine all results together for each season
-# resistSurf.df<- rbind(resistSurf_flood.df, resistSurf_dry.df)
 
 
 ## Map predictive surfaces
 ggplot() +
   geom_tile(data = resistSurf.df, aes(x, y, fill = time)) +
   scale_fill_viridis_c("Time Spent\nper Cell (min)", option = "inferno",
-                       na.value = "transparent", limits = c(0,10)) +
+                       na.value = "transparent") +
   geom_point(data = dat.em, aes(x, y),
              size = 0.5, alpha = 0.5, show.legend = F, color = "chartreuse") +
   scale_x_continuous(expand = c(0,0)) +
@@ -137,3 +139,11 @@ ggplot() +
         legend.text = element_text(size = 12)) +
   guides(fill = guide_colourbar(barwidth = 30, barheight = 1)) +
   facet_wrap(~ month)
+
+
+
+##################################
+### Export prediction surfaces ###
+##################################
+
+# write.csv(resistSurf.df, "Giant Armadillo Resistance Surfaces.csv", row.names = F)
