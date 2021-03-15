@@ -69,7 +69,7 @@ dat.em<-  dat %>%
   filter(id == "emanuel")
 
 #extract beta coeffs (mean)
-betas<- colMeans(store.betas)
+# betas<- colMeans(store.betas)
 
 #Need to center and scale raster values so comparable to beta coeffs
 
@@ -106,7 +106,49 @@ month.dumm<- factor(rep(unique(dat.em$month), each = ncell(evi.s2)), levels = un
 month.dumm<- model.matrix(~month.dumm + 0)
 design.mat<- cbind(month.dumm[,-1], spline.evi)
 
-resistVals<- as.vector(exp(design.mat %*% betas))
+#create list where months are separated into different elements
+design.mat.list<- list()
+oo = 1
+for (i in 1:nlayers(evi.s2)) {
+  design.mat.list[[i]]<- design.mat[oo:(oo - 1 + ncell(evi.s2)),]
+  oo = oo + ncell(evi.s2)
+}
+
+
+
+
+predict.speed<- function(dat.list, betas) {
+  tictoc::tic()
+  
+  #progress bar
+  pb<- progress::progress_bar$new(
+    format = " iteration (:current/:total) [:bar] :percent [Elapsed: :elapsed, Remaining: :eta]",
+    total = nrow(betas), clear = FALSE, width = 100)
+  tmp<- matrix(NA, nrow = nrow(betas), ncol = nrow(dat.list))
+  
+  for (i in 1:nrow(betas))  {
+    tmp[i,]<- exp(dat.list %*% t(betas[i,]))
+    
+    pb$tick()  #create progress bar
+  }
+  
+  resistVals<- data.frame(min = tmp[which.min(rowMeans(tmp, na.rm = T)),],
+                          mean = colMeans(tmp, na.rm = T),
+                          max = tmp[which.max(rowMeans(tmp, na.rm = T)),]
+                          )
+  tictoc::toc()
+  
+  resistVals
+}
+
+
+resistVals<- list()
+resistVals[[1]]<- predict.speed(design.mat.list[[1]], store.betas)  #2.5 min
+resistVals[[2]]<- predict.speed(design.mat.list[[2]], store.betas)  #2 min
+resistVals[[3]]<- predict.speed(design.mat.list[[3]], store.betas)  #2 min
+resistVals[[4]]<- predict.speed(design.mat.list[[4]], store.betas)  #2 min
+resistVals[[5]]<- predict.speed(design.mat.list[[5]], store.betas)  #2 min
+
 
 resistSurf<- evi.s2
 values(resistSurf)<- resistVals

@@ -40,32 +40,34 @@ month1<- factor(month1, levels = unique(month1))
 month.dumm<- model.matrix(~month1 + 0)
 design.mat<- cbind(month.dumm[,-1], spline.evi)
 
-store.betas.mcmc<- coda::as.mcmc(store.betas)
-betas<- as.data.frame(coda::HPDinterval(store.betas.mcmc))
-betas$mean<- colMeans(store.betas.mcmc)
-  
-y.mu<- exp(design.mat %*% betas$mean)
-y.low<- exp(design.mat %*% betas$lower)
-y.up<- exp(design.mat %*% betas$upper)
-  
-  
-# Add results to data frame
-y.mu.df<- data.frame(x = seq.evi,
-                       y = y.mu,
-                       ymin = y.low,
-                       ymax = y.up,
-                       month = month.abb[as.numeric(as.character(month1))]
-                       )
-y.mu.df$month<- factor(y.mu.df$month, levels = unique(y.mu.df$month))
+
+y.post<- matrix(NA, nrow = nrow(store.betas), ncol = nrow(design.mat))
+for (i in 1:nrow(store.betas)) {
+  y.post[i,]<- exp(design.mat %*% t(store.betas[i,]))
+}
+
+y.post.mcmc<- coda::as.mcmc(y.post)
+betas<- as.data.frame(coda::HPDinterval(y.post.mcmc))
+betas$mean<- colMeans(y.post.mcmc)
+betas<- betas %>% 
+  mutate(month = rep(unique(path$month), each = 100),
+         evi = rep(seq.evi, 5),
+         .before =  everything())
+
+# identify and clip off top and bottom 1% of EVI sequence (x-axis)
+clip.vals<- quantile(path$evi, c(0.01,0.99))
+betas2<- betas %>% 
+  filter(evi >= clip.vals[1] & evi <= clip.vals[2])
 
 
 # Plot relationship
-ggplot(data = y.mu.df) +
-  geom_ribbon(aes(x=x, ymin=ymin, ymax=ymax, fill = month), alpha =  0.3) +
+ggplot(data = betas2) +
+  geom_ribbon(aes(x=evi, ymin=lower, ymax=upper, fill = month), alpha =  0.3) +
   scale_fill_viridis_d(guide = F) +
-  geom_line(aes(x, y), size = 1) +
+  geom_line(aes(evi, mean), size = 1) +
   geom_point(data = path, aes(x = evi, y = 1), alpha = 0) +
   geom_rug(data = path, aes(x = evi)) +
+  xlim(clip.vals) +
   labs(x = "\nStandardized EVI", y = "Time Spent per Cell (min)\n") +
   theme_bw() +
   theme(axis.title = element_text(size = 16),
