@@ -21,7 +21,7 @@ path<- path[path$seg.id %in% cond,]
 
 ## Load results from resistance model
 store.betas<- read.csv("Giant Armadillo Resistance Results.csv", as.is = T)
-store.betas<- store.betas[,2:9]
+store.betas<- store.betas[,-1]
 
 
 ## EVI
@@ -31,7 +31,7 @@ seq.evi<- seq(rango1[1], rango1[2], length.out = 100)
 
 #Run splines on standardized sequence
 knot.locs<- seq(rango1[1], rango1[2], length.out = 4)[2:3]
-spline.evi<- bs(seq.evi, degree=2, intercept = FALSE, knots = knot.locs)
+spline.evi<- bs(seq.evi, degree=2, intercept = TRUE, knots = knot.locs)
 spline.evi<- do.call(rbind, replicate(5, spline.evi, simplify=FALSE))
 
 #Create design matrix

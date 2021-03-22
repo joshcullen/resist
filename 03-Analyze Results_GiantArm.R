@@ -21,7 +21,7 @@ path<- path[path$seg.id %in% cond,]
 store.betas<- read.csv("Giant Armadillo Resistance Results.csv", as.is = T)
 
 #look only at betas
-store.betas<- store.betas[,2:9]
+store.betas<- store.betas[,-1]
 store.betas.long<- tidyr::pivot_longer(store.betas,
                                                cols = names(store.betas),
                                                names_to = "betas")
@@ -100,7 +100,7 @@ evi.s2<- evi.s[[which(names(evi.s) %in% unique(dat.em$month))]]
 #Run splines on standardized sequence
 rango1<- range(path$evi)
 knot.locs<- seq(rango1[1], rango1[2], length.out = 4)[2:3]
-spline.evi<- bs(values(evi.s2), degree=2, intercept = FALSE, knots = knot.locs)
+spline.evi<- bs(values(evi.s2), degree=2, intercept = TRUE, knots = knot.locs)
 
 month.dumm<- factor(rep(unique(dat.em$month), each = ncell(evi.s2)), levels = unique(dat.em$month))
 month.dumm<- model.matrix(~month.dumm + 0)
@@ -132,9 +132,8 @@ predict.speed<- function(dat.list, betas) {
     pb$tick()  #create progress bar
   }
   
-  resistVals<- data.frame(min = tmp[which.min(rowMeans(tmp, na.rm = T)),],
-                          mean = colMeans(tmp, na.rm = T),
-                          max = tmp[which.max(rowMeans(tmp, na.rm = T)),]
+  resistVals<- data.frame(mean = colMeans(tmp, na.rm = T),
+                          sd = matrixStats::colSds(tmp)  #much faster than apply()
                           )
   tictoc::toc()
   
@@ -142,28 +141,55 @@ predict.speed<- function(dat.list, betas) {
 }
 
 
-resistVals<- list()
-resistVals[[1]]<- predict.speed(design.mat.list[[1]], store.betas)  #2.5 min
-resistVals[[2]]<- predict.speed(design.mat.list[[2]], store.betas)  #2 min
-resistVals[[3]]<- predict.speed(design.mat.list[[3]], store.betas)  #2 min
-resistVals[[4]]<- predict.speed(design.mat.list[[4]], store.betas)  #2 min
-resistVals[[5]]<- predict.speed(design.mat.list[[5]], store.betas)  #2 min
+
+resistVals<- map(design.mat.list, ~predict.speed(., store.betas))
+
+resistSurf.mean<- resistSurf.sd<- evi.s2
+values(resistSurf.mean)<- map(resistVals, pluck, "mean") %>% unlist()
+values(resistSurf.sd)<- map(resistVals, pluck, "sd") %>% unlist()
 
 
-resistSurf<- evi.s2
-values(resistSurf)<- resistVals
+resistSurf.mean.df<- as.data.frame(resistSurf.mean, xy=T) %>% 
+  pivot_longer(cols = -c(x,y), names_to = "month", values_to = "time") %>% 
+  mutate(type = "Mean")
+resistSurf.mean.df$month<- factor(resistSurf.mean.df$month, levels = names(evi.s2))
 
+resistSurf.sd.df<- as.data.frame(resistSurf.sd, xy=T) %>% 
+  pivot_longer(cols = -c(x,y), names_to = "month", values_to = "time") %>% 
+  mutate(type = "SD")
+resistSurf.sd.df$month<- factor(resistSurf.sd.df$month, levels = names(evi.s2))
 
-resistSurf.df<- as.data.frame(resistSurf, xy=T) %>% 
-  pivot_longer(cols = -c(x,y), names_to = "month", values_to = "time")
-resistSurf.df$month<- factor(resistSurf.df$month, levels = names(evi.s2))
-
+resistSurf.df<- rbind(resistSurf.mean.df, resistSurf.sd.df)
 
 
 ## Map predictive surfaces
+
+#mean
 ggplot() +
-  geom_tile(data = resistSurf.df, aes(x, y, fill = time)) +
+  geom_raster(data = resistSurf.mean.df, aes(x, y, fill = time)) +
   scale_fill_viridis_c("Time Spent\nper Cell (min)", option = "inferno",
+                       na.value = "transparent") +
+  geom_point(data = dat.em, aes(x, y),
+             size = 0.5, alpha = 0.5, show.legend = F, color = "chartreuse") +
+  scale_x_continuous(expand = c(0,0)) +
+  scale_y_continuous(expand = c(0,0)) +
+  labs(x="Easting", y="Northing") +
+  theme_bw() +
+  coord_equal() +
+  theme(legend.position = "bottom",
+        axis.title = element_text(size = 18),
+        axis.text = element_text(size = 10),
+        strip.text = element_text(size = 16, face = "bold"),
+        plot.title = element_text(size = 22),
+        legend.title = element_text(size = 14),
+        legend.text = element_text(size = 12)) +
+  guides(fill = guide_colourbar(barwidth = 30, barheight = 1)) +
+  facet_wrap(~ month)
+
+#SD
+ggplot() +
+  geom_tile(data = resistSurf.sd.df, aes(x, y, fill = time)) +
+  scale_fill_viridis_c("Time Spent\nper Cell (min)", option = "viridis",
                        na.value = "transparent") +
   geom_point(data = dat.em, aes(x, y),
              size = 0.5, alpha = 0.5, show.legend = F, color = "chartreuse") +
@@ -184,8 +210,10 @@ ggplot() +
 
 
 
+
 ##################################
 ### Export prediction surfaces ###
 ##################################
+setwd("~/Documents/Snail Kite Project/Data/R Scripts/ValleLabUF/resist")
 
 # write.csv(resistSurf.df, "Giant Armadillo Resistance Surfaces.csv", row.names = F)

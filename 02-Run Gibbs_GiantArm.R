@@ -43,7 +43,7 @@ path.s$month<- factor(path.s$month, levels = month.abb[c(5:12,1)])
 # Add B-spline (w/ 2 internal knots) for 'EVI'
 rango<- range(path.s$evi)
 knot.locs<- seq(rango[1], rango[2], length.out = 4)[2:3]
-spline.evi<- as.data.frame(bs(path.s$evi, degree=2, intercept = FALSE,
+spline.evi<- as.data.frame(bs(path.s$evi, degree=2, intercept = TRUE,
                                    knots = knot.locs))
 names(spline.evi)<- paste("spline", 1:ncol(spline.evi), sep = ".")
 path.s<- cbind(path.s, spline.evi)
@@ -93,7 +93,7 @@ set.seed(123)
 mod<- gibbs_resist(ysoma = ysoma, xmat = xmat, seg.id = seg.id,
                             ngibbs = ngibbs, nburn = nburn, var.betas = var.betas,
                             w = w, MaxIter = MaxIter)
-# takes 5 min to run (for 10000 iter)
+# takes 6 min to run (for 10000 iter)
 
 
 
