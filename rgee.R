@@ -1,10 +1,11 @@
+library(reticulate)
+eemont <- import('eemont')
 library(tidyverse)
 library(sf)
 library(raster)
 library(lubridate)
 library(sp)
 library(rgee)
-library(raster)
 library(rasterVis)
 library(googledrive)
 
@@ -79,32 +80,76 @@ addNDWI<- function(image) {
                           rename('NDWI')))
 }
 
+# This function calculates EVI from Sentinel-2 imagery
+addEVI<- function(image) {
+  
+  return(image$addBands(image$expression(
+    expression = '2.5 * ((NIR - RED) / (NIR + 6 * RED - 7.5 * BLUE + 1))',
+    opt_map =  list(
+      'NIR' = image$select('B8'),
+      'RED' = image$select('B4'),
+      'BLUE' = image$select('B2')
+    )
+  )$rename('EVI')$toFloat())  #needs to be float, not double
+  )
+  
+}
+
 
 # Map the NDVI and cloud mask functions; select only the NDVI band
-s2_ndvi<- s2$map(maskcloud1)$
-  map(addNDVI)$
-  select('NDVI')
+s2_evi<- s2$
+  maskClouds(prob = 65, cdi = -0.5, buffer = 300)$
+  # map(maskcloud1)$
+  map(addEVI)$
+  select('EVI')
 
-ee_print(s2_ndvi)
-print(s2_ndvi$getInfo())
+ee_print(s2_evi)
+print(s2_evi$getInfo())
 
 
-nimages<- s2_ndvi$size()$getInfo()
-ic_date<- ee_get_date_ic(s2_ndvi)
+nimages<- s2_evi$size()$getInfo()
+ic_date<- ee_get_date_ic(s2_evi)
 
 # Plot the map of the median NDVI for the region
 Map$setCenter(-55.76664, -19.19482, 11)
-Map$addLayer(s2_ndvi$first(),
+Map$addLayer(s2_evi$first(),
              visParams = list(
                min = -0.5,
                max = 1.0,
-               bands = "NDVI",
+               bands = "EVI",
                palette = c(
                  'FFFFFF', 'CE7E45', 'DF923D', 'F1B555', 'FCD163', '99B718', '74A901',
                  '66A000', '529400', '3E8601', '207401', '056201', '004C00', '023B01',
                  '012E01', '011D01', '011301'
                )
              ))
+
+# # Create a number ee$List where each element represent a month
+# months <- ee$List$sequence(1, 12)
+# 
+# # Function to Calculate a monthly composite
+# monthly_s2 <- function(m) {
+#   s2_evi$
+#     filter(ee$Filter$calendarRange(m, m, "month"))$
+#     reduce(ee$Reducer$median()) %>%
+#     ee$Image$select("EVI_median")
+# }
+# s2_monthly <- months$map(ee_utils_pyfunc(monthly_s2))
+# 
+# # Example: Display January and August median composite
+# s2_mean_jan <- ee$Image(s2_monthly$get(0))
+# s2_mean_aug <- ee$Image(s2_monthly$get(7))
+# 
+# ## Vis parameters.
+# visparams <- list(
+#   bands = "EVI_median",
+#   min = -0.5,
+#   max = 1,
+#   palette = palette
+# )
+# 
+# Map$addLayer(s2_mean_jan, visparams, name = "Jan") +
+#   Map$addLayer(s2_mean_aug, visparams, name = "Aug")
 
 pal1<- c(
   'FFFFFF', 'CE7E45', 'DF923D', 'F1B555', 'FCD163', '99B718', '74A901',
@@ -115,10 +160,10 @@ Map$centerObject(bounds, zoom = 11)
 s2_img_list <- list() 
 for (index in seq_len(nimages)) {
   py_index <- index - 1
-  s2_img <- ee$Image(s2_ndvi$toList(1, py_index)$get(0))
+  s2_img <- ee$Image(s2_evi$toList(1, py_index)$get(0))
   s2_img_list[[index]] <- Map$addLayer(
     eeObject = s2_img,
-    visParams = list(min = -0.1, max = 1.0, palette = pal1),
+    visParams = list(min = -0.5, max = 1.0, palette = pal1),
     name = ic_date$id[index]
   )
 }
